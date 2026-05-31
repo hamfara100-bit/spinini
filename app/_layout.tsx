@@ -2,7 +2,7 @@
 // getRandomValues and the WebRTC globals exist before any comms code runs.
 import "../lib/comms/trystero-polyfills";
 import React, { useState, useEffect, useRef } from "react";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, Linking, AppState as RNAppState, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -71,7 +71,12 @@ function BackgroundBridge() {
 }
 
 function AppOpenAdBridge() {
-  useAppOpenAd();
+  // Never show ads while a kid screen is active. We read the pathname here
+  // (inside the Expo Router context) so the check is always current.
+  // The ad still preloads so it's ready the moment the parent returns.
+  const pathname = usePathname();
+  const isKidRoute = pathname.startsWith("/kid/");
+  useAppOpenAd(!isKidRoute);
   return null;
 }
 

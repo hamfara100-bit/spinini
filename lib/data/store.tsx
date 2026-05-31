@@ -48,10 +48,7 @@ function defaultKidRules(): KidRules {
     ],
     appRules: [],
     appRewardRules: [],
-    installedApps: [
-      "youtube_kids", "roblox", "minecraft", "pbs_kids",
-      "duolingo", "calculator", "camera", "spotify",
-    ],
+    installedApps: [],   // parent adds real apps via App Rules → remote-apps screen
     webFilterLevel: "auto",
     webAllowlist: [],
     instantLocked: false,

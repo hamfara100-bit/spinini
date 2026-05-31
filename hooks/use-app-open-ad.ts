@@ -24,11 +24,20 @@ const UNIT_ID = __DEV__
 /** Minimum gap between App Open shows — 4 hours */
 const MIN_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
-export function useAppOpenAd() {
+/**
+ * @param enabled Pass false to suppress showing ads (e.g. when on a kid route).
+ *   The ad still preloads in the background so it's ready when the parent
+ *   returns, but it will never fire while enabled is false.
+ */
+export function useAppOpenAd(enabled = true) {
   const adRef = useRef<AppOpenAd | null>(null);
   const loadedRef = useRef(false);
   const lastShownRef = useRef(0);
   const appStateRef = useRef(RNAppState.currentState);
+  // Use a ref so the AppState listener always sees the latest value without
+  // needing to be re-registered when the route changes.
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
 
   function loadAd() {
     try {
@@ -62,6 +71,7 @@ export function useAppOpenAd() {
   }
 
   function tryShow() {
+    if (!enabledRef.current) return;  // never show on kid screens
     const now = Date.now();
     if (!loadedRef.current || !adRef.current) return;
     if (now - lastShownRef.current < MIN_INTERVAL_MS) return;
