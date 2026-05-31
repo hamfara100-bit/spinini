@@ -21,9 +21,5 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     persistSession: true,
     // No URL-based session detection in a native app (no redirect callback URL).
     detectSessionInUrl: false,
-    // PKCE so native OAuth (Google) returns a ?code we exchange for a session;
-    // the code verifier is stashed in AsyncStorage between launch of the browser
-    // and the redirect back. Required by signInWithGoogle in family-account.ts.
-    flowType: "pkce",
   },
 });

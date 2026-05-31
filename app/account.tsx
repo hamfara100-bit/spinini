@@ -5,7 +5,7 @@ import {
 import { ScreenContainer } from "../components/screen-container";
 import { Colors, Spacing, Radius, FontSize, Shadow } from "../lib/theme";
 import {
-  signUp, signIn, signInWithGoogle, signOut, getMembership, listMembers, createFamily, createPairing, redeemPairing,
+  signUp, signIn, signOut, getMembership, listMembers, createFamily, createPairing, redeemPairing,
   type Membership,
 } from "../lib/family-account";
 
@@ -64,17 +64,6 @@ export default function AccountScreen() {
     try {
       if (authMode === "signup") await signUp(username, password);
       else await signIn(username, password);
-      const m = await getMembership();
-      if (m) { setMe(m); setMembers(await listMembers()); setScreen("family"); }
-      else { setScreen("setup"); }
-    } catch (e) { fail(e); } finally { setBusy(false); }
-  }
-
-  async function handleGoogle() {
-    setBusy(true); setError("");
-    try {
-      const ok = await signInWithGoogle();
-      if (!ok) return; // user cancelled the browser
       const m = await getMembership();
       if (m) { setMe(m); setMembers(await listMembers()); setScreen("family"); }
       else { setScreen("setup"); }
@@ -145,16 +134,6 @@ export default function AccountScreen() {
           </TouchableOpacity>
           <TouchableOpacity onPress={() => { setAuthMode(m => m === "signup" ? "login" : "signup"); setError(""); }}>
             <Text style={styles.link}>{authMode === "signup" ? "Already have an account? Log in" : "Need an account? Sign up"}</Text>
-          </TouchableOpacity>
-
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          <TouchableOpacity style={styles.googleBtn} onPress={handleGoogle} disabled={busy} activeOpacity={0.85}>
-            <Text style={styles.googleG}>G</Text>
-            <Text style={styles.googleText}>Continue with Google</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -253,15 +232,6 @@ const styles = StyleSheet.create({
   secondaryBtn: { backgroundColor: Colors.primary + "18", borderRadius: Radius.md, paddingVertical: 14, alignItems: "center" },
   secondaryBtnText: { color: Colors.primary, fontWeight: "800", fontSize: FontSize.base },
   link: { color: Colors.primary, fontWeight: "600", textAlign: "center", paddingVertical: 6 },
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
-  dividerText: { fontSize: FontSize.sm, color: Colors.textMuted, fontWeight: "600" },
-  googleBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-    backgroundColor: "#4285F4", borderRadius: Radius.md, paddingVertical: 14,
-  },
-  googleG: { fontSize: 20, fontWeight: "900", color: "#fff", fontStyle: "italic" },
-  googleText: { color: "#fff", fontWeight: "800", fontSize: FontSize.base },
   sectionLabel: { fontSize: FontSize.xs, fontWeight: "700", color: Colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 },
   memberRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
   memberEmoji: { fontSize: 22 },

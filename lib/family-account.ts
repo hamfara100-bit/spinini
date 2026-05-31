@@ -10,9 +10,6 @@
  * Supabase, never by us.
  */
 
-import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
-import { makeRedirectUri } from "expo-auth-session";
 import { supabase } from "./supabase";
 
 export type MemberRole = "parent" | "kid";
@@ -44,50 +41,6 @@ export async function signIn(username: string, password: string): Promise<void> 
     password,
   });
   if (error) throw new Error(error.message);
-}
-
-/**
- * Sign in (or sign up) with Google, routed entirely through Supabase Auth — no
- * Google client IDs live in the app. Identity only: a Google user becomes a
- * normal `auth.users` row and creates / joins a family exactly like a
- * username/password user.
- *
- * Native PKCE flow: ask Supabase for the provider URL, open it in the system
- * auth browser, and when Google redirects back to our `famkids://` scheme,
- * exchange the returned `?code` for a session. Returns false if the user
- * cancels/dismisses the browser.
- *
- * SETUP (one-time, dashboard): in Supabase → Authentication → Providers, enable
- * Google with a Google Cloud "Web" OAuth client whose redirect URI is
- * `https://<project-ref>.supabase.co/auth/v1/callback`; and in Authentication →
- * URL Configuration → Redirect URLs, allow `famkids://*`.
- *
- * NOTE: this is login only — no Drive/Photos scopes are requested. Backups are
- * fully local now (see lib/data-export.ts: export to a shareable .zip), so the
- * app no longer needs any Google API scopes or client IDs.
- */
-export async function signInWithGoogle(): Promise<boolean> {
-  const redirectTo = makeRedirectUri({ scheme: "famkids", path: "auth-callback" });
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo, skipBrowserRedirect: true },
-  });
-  if (error) throw new Error(error.message);
-  if (!data?.url) throw new Error("Could not start Google sign-in.");
-
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== "success") return false; // cancelled / dismissed
-
-  const { queryParams } = Linking.parse(result.url);
-  const errDesc = queryParams?.error_description;
-  if (errDesc) throw new Error(String(errDesc));
-  const code = queryParams?.code;
-  if (typeof code !== "string") throw new Error("No authorization code returned from Google.");
-
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-  if (exchangeError) throw new Error(exchangeError.message);
-  return true;
 }
 
 export async function signOut(): Promise<void> {
