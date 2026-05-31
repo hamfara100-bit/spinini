@@ -19,6 +19,16 @@ export default function AccountScreen() {
       </View>
       <View style={styles.card}><Text style={styles.cardTitle}>Parent PIN</Text><Text style={styles.cardSub}>••••</Text></View>
       <View style={styles.card}><Text style={styles.cardTitle}>Kids</Text><Text style={styles.cardSub}>{state.kids.length} child{state.kids.length !== 1 ? "ren" : ""}</Text></View>
+
+      <TouchableOpacity style={styles.cloudCard} onPress={() => router.push("/account" as any)}>
+        <Text style={styles.cloudEmoji}>☁️</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cloudTitle}>Family Cloud Account</Text>
+          <Text style={styles.cloudSub}>Sign in to connect devices across the family</Text>
+        </View>
+        <Text style={styles.cloudChevron}>›</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.signOutBtn} onPress={() => router.replace("/")}><Text style={styles.signOutText}>← Back to Profiles</Text></TouchableOpacity>
     </ScreenContainer>
   );
@@ -31,6 +41,11 @@ const styles = StyleSheet.create({
   card: { backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: 8, ...Shadow.sm },
   cardTitle: { fontSize: FontSize.base, fontWeight: "700", color: Colors.textPrimary },
   cardSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  cloudCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: Colors.primary + "12", borderRadius: Radius.lg, padding: Spacing.md, marginTop: 8, marginBottom: 8, borderWidth: 1.5, borderColor: Colors.primary + "33" },
+  cloudEmoji: { fontSize: 26 },
+  cloudTitle: { fontSize: FontSize.base, fontWeight: "800", color: Colors.textPrimary },
+  cloudSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  cloudChevron: { fontSize: 28, color: Colors.primary, fontWeight: "800" },
   signOutBtn: { alignItems: "center", padding: Spacing.md, marginTop: Spacing.md },
   signOutText: { color: Colors.primary, fontWeight: "600" },
 });

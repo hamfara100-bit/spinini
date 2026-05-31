@@ -44,8 +44,6 @@ export default function ParentLayout() {
   }, 0);
 
   async function checkPin(pin: string) {
-    // TEST BYPASS — remove before production
-    if (pin === "1234") { setUnlocked(true); setError(""); return; }
     const hashed = await hashPin(pin);
     if (hashed === state.parentSettings.pin) {
       setUnlocked(true);
