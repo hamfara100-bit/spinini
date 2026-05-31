@@ -61,6 +61,7 @@ function getMemberFromMap(
 }
 
 function defaultRelation(gen: number, pos: number): string {
+  if (gen < 0) return "Relative";  // free-form "Other Relatives" node
   if (gen === 0) return "You";
   if (gen === 1) return pos === 0 ? "Father" : "Mother";
   if (gen === 2) {
@@ -296,7 +297,8 @@ function EditModal({
     });
   }
 
-  const accent = GEN_COLORS[generation] ?? Colors.primary;
+  const isOther = generation < 0;
+  const accent = isOther ? "#0EA5E9" : (GEN_COLORS[generation] ?? Colors.primary);
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -306,7 +308,7 @@ function EditModal({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={s.editTitle}>{member ? "✏️ Edit Family Member" : "➕ Add to Family Tree"}</Text>
+          <Text style={s.editTitle}>{member ? "✏️ Edit Family Member" : isOther ? "➕ Add a Relative" : "➕ Add to Family Tree"}</Text>
 
           {/* Photo picker */}
           <TouchableOpacity style={[s.photoPicker, { borderColor: accent + "66" }]} onPress={pickPhoto} activeOpacity={0.8}>
@@ -354,7 +356,7 @@ function EditModal({
               <Text style={s.cancelTxt}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.saveBtn, { backgroundColor: accent }]} onPress={save}>
-              <Text style={s.saveTxt}>{member ? "Save Changes" : "Add to Tree"}</Text>
+              <Text style={s.saveTxt}>{member ? "Save Changes" : isOther ? "Add Relative" : "Add to Tree"}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -371,21 +373,27 @@ export default function FamilyTreeScreen() {
   // O(1) lookup map — rebuilt only when the familyTree array changes
   const memberMap = useMemo(() => buildMemberMap(members), [members]);
 
-  const [selGen, setSelGen] = useState<number | null>(null);
-  const [selPos, setSelPos] = useState<number | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
-  const [showEdit,   setShowEdit]   = useState(false);
+  const [detailMember, setDetailMember] = useState<FamilyTreeMember | null>(null);
+  const [editTarget, setEditTarget] =
+    useState<{ generation: number; positionIndex: number; member?: FamilyTreeMember } | null>(null);
 
-  const selMember = selGen !== null && selPos !== null
-    ? getMemberFromMap(memberMap, selGen, selPos)
-    : undefined;
+  // Free-form "Other Relatives" live OUTSIDE the fixed ancestor grid, at
+  // generation -1, so they never collide with the 15 binary-tree slots. You can
+  // add as many as you like and delete any of them.
+  const otherMembers = useMemo(
+    () => members.filter(m => m.generation < 0).sort((a, b) => a.positionIndex - b.positionIndex),
+    [members],
+  );
 
   function openNode(gen: number, pos: number) {
-    setSelGen(gen);
-    setSelPos(pos);
     const m = getMemberFromMap(memberMap, gen, pos);
-    if (m) setShowDetail(true);
-    else   setShowEdit(true);
+    if (m) setDetailMember(m);
+    else   setEditTarget({ generation: gen, positionIndex: pos });
+  }
+
+  function openAddOther() {
+    const nextPos = otherMembers.reduce((mx, m) => Math.max(mx, m.positionIndex + 1), 0);
+    setEditTarget({ generation: -1, positionIndex: nextPos });
   }
 
   function handleSave(data: Partial<FamilyTreeMember> & { existingId?: string }) {
@@ -408,24 +416,23 @@ export default function FamilyTreeScreen() {
       };
       dispatch({ type: "FAMILY_TREE_ADD", member: newMember });
     }
-    setShowEdit(false);
-    setShowDetail(false);
+    setEditTarget(null);
+    setDetailMember(null);
   }
 
-  function handleDelete() {
-    if (!selMember) return;
+  function handleDelete(member: FamilyTreeMember) {
     confirmDestructive(
       "Remove from tree?",
-      `Remove ${selMember.name}?`,
+      `Remove ${member.name}?`,
       () => {
-        dispatch({ type: "FAMILY_TREE_DELETE", memberId: selMember.id });
-        setShowDetail(false);
+        dispatch({ type: "FAMILY_TREE_DELETE", memberId: member.id });
+        setDetailMember(null);
       },
       "Remove",
     );
   }
 
-  const filled = members.length;
+  const filled = members.length - otherMembers.length; // filled ancestor slots
   const total  = 1 + 2 + 4 + 8; // 15
 
   return (
@@ -485,26 +492,65 @@ export default function FamilyTreeScreen() {
         </View>
       )}
 
+      {/* ── Other Relatives (free-form, outside the ancestor grid) ── */}
+      <View style={s.otherSection}>
+        <View style={s.otherHeaderRow}>
+          <Text style={s.otherTitle}>👪 Other Relatives</Text>
+          <TouchableOpacity style={s.addOtherBtn} onPress={openAddOther} activeOpacity={0.85}>
+            <Text style={s.addOtherTxt}>＋ Add</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={s.otherSub}>
+          Siblings, cousins, aunts, uncles, your own kids — anyone outside the ancestor grid.
+        </Text>
+
+        {otherMembers.length === 0 ? (
+          <TouchableOpacity style={s.otherEmpty} onPress={openAddOther} activeOpacity={0.8}>
+            <Text style={s.otherEmptyTxt}>＋ Add your first relative</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={s.otherGrid}>
+            {otherMembers.map(m => (
+              <TouchableOpacity key={m.id} style={s.otherCard} onPress={() => setDetailMember(m)} activeOpacity={0.85}>
+                {m.photoUri ? (
+                  <Image source={{ uri: m.photoUri }} style={s.otherAvatar} />
+                ) : (
+                  <View style={s.otherInitial}>
+                    <Text style={s.otherInitialTxt}>{m.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
+                <Text style={s.otherName} numberOfLines={1}>{m.name}</Text>
+                <Text style={s.otherRel} numberOfLines={1}>{m.relation}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
       <View style={{ height: 32 }} />
 
       {/* Detail modal */}
-      {showDetail && selMember && (
+      {detailMember && (
         <DetailModal
-          member={selMember}
-          onClose={() => setShowDetail(false)}
-          onEdit={() => { setShowDetail(false); setShowEdit(true); }}
-          onDelete={handleDelete}
+          member={detailMember}
+          onClose={() => setDetailMember(null)}
+          onEdit={() => {
+            const m = detailMember;
+            setDetailMember(null);
+            setEditTarget({ generation: m.generation, positionIndex: m.positionIndex, member: m });
+          }}
+          onDelete={() => handleDelete(detailMember)}
         />
       )}
 
       {/* Edit / Add modal */}
-      {showEdit && selGen !== null && selPos !== null && (
+      {editTarget && (
         <EditModal
-          generation={selGen}
-          positionIndex={selPos}
-          member={selMember}
+          generation={editTarget.generation}
+          positionIndex={editTarget.positionIndex}
+          member={editTarget.member}
           onSave={handleSave}
-          onClose={() => setShowEdit(false)}
+          onClose={() => setEditTarget(null)}
         />
       )}
     </ScreenContainer>
@@ -526,6 +572,32 @@ const s = StyleSheet.create({
     borderColor: Colors.primary + "2A",
   },
   tipTxt: { fontSize: FontSize.xs, color: Colors.primary, textAlign: "center", fontWeight: "600" },
+
+  // Other Relatives (free-form, outside the ancestor grid)
+  otherSection: { marginTop: 18 },
+  otherHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  otherTitle: { fontSize: FontSize.md, fontWeight: "900", color: Colors.textPrimary },
+  addOtherBtn: { backgroundColor: "#0EA5E9", borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 6 },
+  addOtherTxt: { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
+  otherSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: 10 },
+  otherEmpty: {
+    borderWidth: 1.5, borderStyle: "dashed", borderColor: "#0EA5E966", borderRadius: Radius.lg,
+    paddingVertical: 18, alignItems: "center", backgroundColor: "#0EA5E90C",
+  },
+  otherEmptyTxt: { color: "#0284C7", fontWeight: "700", fontSize: FontSize.sm },
+  otherGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  otherCard: {
+    width: 84, alignItems: "center", backgroundColor: "#fff", borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: Colors.border, paddingVertical: 10, paddingHorizontal: 4, ...Shadow.sm,
+  },
+  otherAvatar: { width: 44, height: 44, borderRadius: 22, marginBottom: 6, borderWidth: 2, borderColor: "#0EA5E9" },
+  otherInitial: {
+    width: 44, height: 44, borderRadius: 22, marginBottom: 6, alignItems: "center", justifyContent: "center",
+    backgroundColor: "#0EA5E918", borderWidth: 1.5, borderColor: "#0EA5E955",
+  },
+  otherInitialTxt: { fontSize: 18, fontWeight: "800", color: "#0284C7" },
+  otherName: { fontSize: 11, fontWeight: "800", color: Colors.textPrimary, textAlign: "center" },
+  otherRel: { fontSize: 9, color: Colors.textSecondary, textAlign: "center", marginTop: 1 },
 
   // Tree
   treeScroll: {
