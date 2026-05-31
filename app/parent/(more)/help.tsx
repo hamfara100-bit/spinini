@@ -13,6 +13,8 @@ import { AudioModule } from "expo-audio";
 import { useCameraPermissions } from "expo-camera";
 import { ScreenContainer } from "../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
+import { useData } from "../../../lib/data/store";
+import { exportAndShare, savePhotosToGallery, importBackup } from "../../../lib/data-export";
 
 type Tab = "help" | "guide" | "privacy";
 
@@ -581,12 +583,79 @@ async function requestAllPermissions(cameraRequest: () => Promise<any>): Promise
 
 export default function HelpPrivacyScreen() {
   const router = useRouter();
+  const { state, dispatch } = useData();
   const [tab, setTab] = useState<Tab>("help");
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [savingPhotos, setSavingPhotos] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [, requestCamera] = useCameraPermissions();
   const [selectedCat, setSelectedCat] = useState<string>(GUIDE_CATEGORIES[0].id);
   const activeGuide = GUIDE_CATEGORIES.find(c => c.id === selectedCat) ?? GUIDE_CATEGORIES[0];
+
+  async function handleExportData() {
+    setExporting(true);
+    try {
+      const r = await exportAndShare(state);
+      // The share sheet has already opened; this confirms what was bundled.
+      Alert.alert(
+        "📦 Export ready",
+        `Bundled ${r.noteCount} note${r.noteCount !== 1 ? "s" : ""}, ${r.ideaCount} idea${r.ideaCount !== 1 ? "s" : ""} and ${r.photoCount} photo${r.photoCount !== 1 ? "s" : ""} from ${r.kids} child${r.kids !== 1 ? "ren" : ""} into a .zip.\n\nUse the share sheet to save it to Google Drive, Files, or anywhere you like.`,
+      );
+    } catch (e) {
+      Alert.alert("Export failed", e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function handleImportData() {
+    Alert.alert(
+      "Restore from backup?",
+      "This REPLACES all current data on this device with the contents of a Spinini export .zip. Use this when setting up a new device. This can't be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Choose file",
+          style: "destructive",
+          onPress: async () => {
+            setImporting(true);
+            try {
+              const res = await importBackup();
+              if (!res) return; // user cancelled the file picker
+              (dispatch as (a: any) => void)({ type: "@@HYDRATE", payload: res.state });
+              Alert.alert(
+                "✅ Data restored",
+                `Imported ${res.kids} child${res.kids !== 1 ? "ren" : ""} and ${res.photosRestored} photo${res.photosRestored !== 1 ? "s" : ""}.`,
+              );
+            } catch (e) {
+              Alert.alert("Import failed", e instanceof Error ? e.message : String(e));
+            } finally {
+              setImporting(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  async function handleSavePhotos() {
+    setSavingPhotos(true);
+    try {
+      const n = await savePhotosToGallery(state);
+      Alert.alert(
+        n > 0 ? "🖼️ Photos saved" : "No photos to save",
+        n > 0
+          ? `Saved ${n} photo${n !== 1 ? "s" : ""} to your gallery in the "Spinini" album.`
+          : "We couldn't find any saved pictures in your family's data yet.",
+      );
+    } catch (e) {
+      Alert.alert("Couldn't save photos", e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingPhotos(false);
+    }
+  }
 
   async function handleCheckPermissions() {
     setChecking(true);
@@ -663,6 +732,29 @@ export default function HelpPrivacyScreen() {
             {checking ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.permBtnText}>🔐 Check & Request App Permissions</Text>}
           </TouchableOpacity>
           <Text style={styles.permHint}>Tap to ensure Spinini has all necessary device permissions — camera, location, microphone, notifications, and more.</Text>
+
+          {/* ── Export my data ── */}
+          <View style={styles.exportCard}>
+            <Text style={styles.exportTitle}>📦 Export My Data</Text>
+            <Text style={styles.exportSub}>
+              Bundle everyone's notes, ideas and photos into a .zip you can save to Google Drive,
+              Files, or anywhere — organised in neat folders per child. Your data never leaves your device until you share it.
+            </Text>
+            <TouchableOpacity style={[styles.exportBtn, exporting && { opacity: 0.7 }]} onPress={handleExportData} disabled={exporting} activeOpacity={0.85}>
+              {exporting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.exportBtnText}>Export &amp; Share .zip</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.exportSecondaryBtn, savingPhotos && { opacity: 0.7 }]} onPress={handleSavePhotos} disabled={savingPhotos} activeOpacity={0.85}>
+              {savingPhotos ? <ActivityIndicator color={Colors.primary} size="small" /> : <Text style={styles.exportSecondaryText}>🖼️ Save all photos to gallery</Text>}
+            </TouchableOpacity>
+
+            <View style={styles.exportDivider} />
+            <Text style={styles.exportSub}>
+              Got a new device? Restore everything from a backup .zip you exported on the old one.
+            </Text>
+            <TouchableOpacity style={[styles.exportSecondaryBtn, importing && { opacity: 0.7 }]} onPress={handleImportData} disabled={importing} activeOpacity={0.85}>
+              {importing ? <ActivityIndicator color={Colors.primary} size="small" /> : <Text style={styles.exportSecondaryText}>📥 Import / Restore from .zip</Text>}
+            </TouchableOpacity>
+          </View>
 
           {SECTIONS.map((section, si) => (
             <View key={si} style={styles.section}>
@@ -936,6 +1028,15 @@ const styles = StyleSheet.create({
   permBtn:            { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingVertical: 13, alignItems: "center", marginBottom: 6 },
   permBtnText:        { color: "#fff", fontWeight: "800", fontSize: FontSize.base },
   permHint:           { fontSize: FontSize.xs, color: Colors.textMuted, textAlign: "center", marginBottom: Spacing.lg },
+
+  exportCard:         { backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1.5, borderColor: Colors.primary + "33", ...Shadow.sm },
+  exportTitle:        { fontSize: FontSize.base, fontWeight: "800", color: Colors.textPrimary, marginBottom: 4 },
+  exportSub:          { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 18, marginBottom: 12 },
+  exportBtn:          { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 13, alignItems: "center", marginBottom: 8 },
+  exportBtnText:      { color: "#fff", fontWeight: "800", fontSize: FontSize.base },
+  exportSecondaryBtn: { backgroundColor: Colors.primary + "18", borderRadius: Radius.md, paddingVertical: 13, alignItems: "center" },
+  exportSecondaryText:{ color: Colors.primary, fontWeight: "800", fontSize: FontSize.base },
+  exportDivider:      { height: 1, backgroundColor: Colors.border, marginVertical: 12 },
 
   section:            { marginBottom: Spacing.md },
   sectionTitle:       { fontSize: FontSize.base, fontWeight: "800", color: Colors.textPrimary, marginBottom: 8, paddingLeft: 4, borderLeftWidth: 3, borderLeftColor: Colors.primary, paddingVertical: 2 },
