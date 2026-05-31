@@ -53,8 +53,6 @@ export const SYNC_ENABLED = true;
  */
 const SYNC_DENYLIST = new Set<string>([
   "@@HYDRATE",
-  "SET_PARENT_GOOGLE", "CLEAR_PARENT_GOOGLE",
-  "SET_KID_GOOGLE", "CLEAR_KID_GOOGLE",
   "SET_PIN_RECOVERY_CODE",
   "VAULT_ADD", "VAULT_REMOVE",  // password manager — parent-device-only
 ]);

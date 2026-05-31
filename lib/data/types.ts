@@ -24,7 +24,6 @@ export interface KidProfile {
   pin?: string;
   sound?: string;
   createdAt: string;
-  googleAccount?: GoogleAccount;
 }
 
 export interface ParentProfile {
@@ -43,16 +42,6 @@ export interface ParentMembership {
   createdAt: string;
 }
 
-export interface GoogleAccount {
-  id: string;
-  email: string;
-  name: string;
-  picture?: string;
-  accessToken?: string;   // stored in SecureStore, stripped from AsyncStorage state
-  refreshToken?: string;  // stored in SecureStore
-  expiresAt?: number;
-}
-
 export type CallMode = "app" | "native" | "smart";
 
 export interface ParentSettings {
@@ -63,7 +52,6 @@ export interface ParentSettings {
   callMode?: CallMode; // global default: app | native | smart
   uninstallProtection: boolean;
   emailDigest: boolean;
-  googleAccount?: GoogleAccount;
   lastBackupAt?: string;
   backupEnabled: boolean;
   // Consent & legal
@@ -95,11 +83,6 @@ export interface ParentSettings {
   findPhoneFromKidId?: string;
   findPhoneFromKidName?: string;
   findPhoneTriggeredAt?: string;
-}
-
-export interface KidGoogleAccount {
-  kidId: string;
-  googleAccount: GoogleAccount;
 }
 
 // ─── Rules & Controls ───────────────────────────────────────────────────────
@@ -2136,12 +2119,8 @@ export type AppAction =
   | { type: "SET_PARENT_SETTINGS"; payload: Partial<ParentSettings> }
   | { type: "SET_PARENT_PROFILE"; payload: Partial<ParentProfile> }
   | { type: "SET_PARENT_MEMBERSHIP"; payload: ParentMembership }
-  | { type: "SET_PARENT_GOOGLE"; account: GoogleAccount }
-  | { type: "CLEAR_PARENT_GOOGLE" }
   | { type: "SET_PARENT_APPLE"; userId: string; email?: string; fullName?: string }
   | { type: "CLEAR_PARENT_APPLE" }
-  | { type: "SET_KID_GOOGLE"; kidId: string; account: GoogleAccount }
-  | { type: "CLEAR_KID_GOOGLE"; kidId: string }
   | { type: "SET_LAST_BACKUP"; timestamp: string }
   // Kids
   | { type: "ADD_KID"; payload: KidProfile }

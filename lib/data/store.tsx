@@ -2,7 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode, use
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { saveVaultPassword, deleteVaultPassword } from "../vault-store";
 import { uid } from "../utils";
-import { saveGoogleTokens, deleteGoogleTokens, saveRecoveryCode } from "../secure-tokens";
+import { saveRecoveryCode } from "../secure-tokens";
 import { useFamilySync } from "./sync-bridge";
 import {
   AppState, AppAction, KidState, KidProfile, KidRules,
@@ -330,22 +330,10 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, setupDone: true };
     case "SET_PARENT_SETTINGS":
       return { ...state, parentSettings: { ...state.parentSettings, ...action.payload } };
-    case "SET_PARENT_GOOGLE":
-      // Store metadata only — tokens are saved to SecureStore in secureDispatch
-      return { ...state, parentSettings: { ...state.parentSettings, googleAccount: { id: action.account.id, email: action.account.email, name: action.account.name, picture: action.account.picture } } };
-    case "CLEAR_PARENT_GOOGLE":
-      return { ...state, parentSettings: { ...state.parentSettings, googleAccount: undefined } };
     case "SET_PARENT_APPLE":
       return { ...state, parentSettings: { ...state.parentSettings, appleUserId: action.userId, appleEmail: action.email, appleFullName: action.fullName } };
     case "CLEAR_PARENT_APPLE":
       return { ...state, parentSettings: { ...state.parentSettings, appleUserId: undefined, appleEmail: undefined, appleFullName: undefined } };
-    case "SET_KID_GOOGLE":
-      // Store account metadata only — tokens are saved to SecureStore in secureDispatch
-      return updateKid(state, action.kidId, k => ({
-        ...k, profile: { ...k.profile, googleAccount: { id: action.account.id, email: action.account.email, name: action.account.name, picture: action.account.picture } },
-      }));
-    case "CLEAR_KID_GOOGLE":
-      return updateKid(state, action.kidId, k => ({ ...k, profile: { ...k.profile, googleAccount: undefined } }));
     case "SET_LAST_BACKUP":
       return { ...state, parentSettings: { ...state.parentSettings, lastBackupAt: action.timestamp } };
     case "SET_PARENT_PROFILE":
@@ -2315,23 +2303,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     } else if (action.type === "VAULT_REMOVE") {
       deleteVaultPassword(action.entryId).catch(() => {});
-    } else if (action.type === "SET_PARENT_GOOGLE") {
-      const { accessToken, refreshToken, expiresAt } = action.account;
-      if (accessToken) {
-        saveGoogleTokens(action.account.id, { accessToken, refreshToken, expiresAt }).catch(() => {});
-      }
-    } else if (action.type === "CLEAR_PARENT_GOOGLE") {
-      const accountId = state.parentSettings.googleAccount?.id;
-      if (accountId) deleteGoogleTokens(accountId).catch(() => {});
-    } else if (action.type === "SET_KID_GOOGLE") {
-      const { accessToken, refreshToken, expiresAt } = action.account;
-      if (accessToken) {
-        saveGoogleTokens(action.account.id, { accessToken, refreshToken, expiresAt }).catch(() => {});
-      }
-    } else if (action.type === "CLEAR_KID_GOOGLE") {
-      const kid = state.kids.find(k => k.profile.id === action.kidId);
-      const accountId = kid?.profile.googleAccount?.id;
-      if (accountId) deleteGoogleTokens(accountId).catch(() => {});
     } else if (action.type === "SET_PIN_RECOVERY_CODE") {
       saveRecoveryCode(action.code).catch(() => {});
     }

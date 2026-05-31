@@ -114,14 +114,12 @@ export default function ProfilePicker() {
           activeOpacity={0.85}
         >
           <Text style={{ fontSize: 48 }}>
-            {state.parentSettings.appleUserId ? "" : state.parentSettings.googleAccount ? "👤" : "🔒"}
+            {state.parentSettings.appleUserId ? "" : "🔒"}
           </Text>
           <Text style={styles.kidName}>Parent</Text>
           <Text style={styles.kidAge}>
             {state.parentSettings.appleFullName
               ? state.parentSettings.appleFullName
-              : state.parentSettings.googleAccount
-              ? state.parentSettings.googleAccount.name
               : state.parentSettings.pin
               ? "PIN required"
               : "Tap to enter"}
@@ -129,11 +127,6 @@ export default function ProfilePicker() {
           {state.parentSettings.appleUserId && (
             <View style={[styles.googleBadge, { backgroundColor: "#00000015" }]}>
               <Text style={[styles.googleBadgeText, { color: "#000" }]}> Apple ID</Text>
-            </View>
-          )}
-          {!state.parentSettings.appleUserId && state.parentSettings.googleAccount && (
-            <View style={[styles.googleBadge, { backgroundColor: "#4285F420" }]}>
-              <Text style={[styles.googleBadgeText, { color: "#4285F4" }]}>☁️ Google</Text>
             </View>
           )}
         </TouchableOpacity>
