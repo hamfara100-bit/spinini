@@ -1,0 +1,9 @@
+{
+  "name": "expo-loud-alarm",
+  "version": "1.0.0",
+  "description": "Force-unmute Android device and play alarm at max volume",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

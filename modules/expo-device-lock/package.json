@@ -1,0 +1,9 @@
+{
+  "name": "expo-device-lock",
+  "version": "1.0.0",
+  "description": "Full-screen overlay lock via SYSTEM_ALERT_WINDOW",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

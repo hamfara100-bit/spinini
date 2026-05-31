@@ -1,0 +1,198 @@
+{
+  "expo": {
+    "name": "Spinini Parental Control",
+    "slug": "famkidsapp",
+    "version": "1.0.0",
+    "runtimeVersion": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "androidNavigationBar": {
+      "visible": "immersive"
+    },
+    "androidStatusBar": {
+      "hidden": true,
+      "translucent": false
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#7C5CFF"
+    },
+    "description": "Abuee - Free Parental Control+ is a completely free family management and parental control app. Set screen time limits, track app usage, monitor location, manage chores and rewards, and keep your family organized — all in one place. No ads on kids' side, ever. Built for parents with a child-friendly interface kids will love.",
+    "primaryColor": "#7C5CFF",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.famkids.app",
+      "buildNumber": "1",
+      "requireFullScreen": false,
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ]
+      },
+      "entitlements": {
+        "com.apple.developer.family-controls": true
+      },
+      "infoPlist": {
+        "NSPrivacyPolicyURL": "https://famkids.app/privacy",
+        "NSPrivacyPolicyURLDescription": "Abuee privacy policy — also available in-app under Help & Privacy.",
+        "LSApplicationQueriesSchemes": [
+          "sketchbook",
+          "ibispaint",
+          "procreate",
+          "adobefresco",
+          "medibang",
+          "infinitepainter",
+          "com.samsung.sketchbook",
+          "tayasui-sketches"
+        ],
+        "NSCameraUsageDescription": "Abuee needs camera access to take photos for assignments, achievements, workouts, and discoveries.",
+        "NSPhotoLibraryUsageDescription": "Abuee needs access to your photo library to attach images to assignments, achievements, and discoveries.",
+        "NSPhotoLibraryAddUsageDescription": "Abuee needs permission to save photos to your library.",
+        "NSMicrophoneUsageDescription": "Abuee needs microphone access so kids can record their own stories using their voice.",
+        "NSLocationWhenInUseUsageDescription": "Abuee needs location access to show your current location to your parents.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Abuee needs location access so parents can see where their kids are and set safe zones.",
+        "NSLocationAlwaysUsageDescription": "Abuee needs background location access so parents can always see their kids' location and receive safe-zone alerts.",
+        "NSContactsUsageDescription": "Abuee needs access to your contacts to display emergency contact information.",
+        "NSMotionUsageDescription": "Abuee uses motion data to track fitness activity and step counts.",
+        "NSFaceIDUsageDescription": "Abuee can use Face ID to quickly unlock parent controls.",
+        "NSSpeechRecognitionUsageDescription": "Abuee uses speech recognition so you can use your voice to fill in any text field hands-free.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.famkids.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#7C5CFF"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.WAKE_LOCK",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-apple-authentication",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Abuee needs camera access to take photos for assignments, achievements, workouts, and discoveries.",
+          "microphonePermission": "Abuee needs microphone access to record video messages and stories."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Abuee needs access to your photo library to attach images to assignments, achievements, and discoveries.",
+          "cameraPermission": "Abuee needs camera access to take photos."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Abuee needs microphone access so kids can record their own stories using their voice."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Abuee needs access to your photo library.",
+          "savePhotosPermission": "Abuee needs permission to save photos to your library.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Abuee needs access to your contacts to display emergency contact information."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#7C5CFF",
+          "sounds": []
+        }
+      ],
+      "expo-task-manager",
+      "expo-background-fetch",
+      "./plugins/withAppMonitor",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Abuee needs location access so parents can see where their kids are and set safe zones.",
+          "locationWhenInUsePermission": "Abuee needs location access to show your current location to your parents.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-speech-recognition",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-6547633616671165~1006775154",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      "@config-plugins/react-native-webrtc"
+    ],
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/b0a2aa5f-5bb1-4c70-ab41-a07020f5392f"
+    },
+    "scheme": "famkids",
+    "extra": {
+      "router": {},
+      "privacyPolicyUrl": "https://famkids.app/privacy",
+      "termsOfServiceUrl": "https://famkids.app/terms",
+      "supportEmail": "support@famkids.app",
+      "aiProvider": "OpenRouter (meta-llama/llama-3.1-8b-instruct:free)",
+      "eas": {
+        "projectId": "b0a2aa5f-5bb1-4c70-ab41-a07020f5392f"
+      }
+    },
+    "owner": "hamdi123"
+  }
+}

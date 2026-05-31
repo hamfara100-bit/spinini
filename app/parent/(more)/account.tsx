@@ -1,0 +1,36 @@
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
+import { useData } from "../../../lib/data/store";
+import { ScreenContainer } from "../../../components/screen-container";
+import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
+import { Mascot } from "../../../components/mascot";
+
+export default function AccountScreen() {
+  const { state } = useData();
+  const router = useRouter();
+  return (
+    <ScreenContainer scroll>
+      <Text style={styles.title}>👤 Account</Text>
+      <View style={styles.profileCard}>
+        <Mascot type={state.parent.mascot} size={64} animate={false} />
+        <Text style={styles.name}>{state.parentSettings.name}</Text>
+        {state.parentMembership && <Text style={styles.email}>{state.parentMembership.email}</Text>}
+      </View>
+      <View style={styles.card}><Text style={styles.cardTitle}>Parent PIN</Text><Text style={styles.cardSub}>••••</Text></View>
+      <View style={styles.card}><Text style={styles.cardTitle}>Kids</Text><Text style={styles.cardSub}>{state.kids.length} child{state.kids.length !== 1 ? "ren" : ""}</Text></View>
+      <TouchableOpacity style={styles.signOutBtn} onPress={() => router.replace("/")}><Text style={styles.signOutText}>← Back to Profiles</Text></TouchableOpacity>
+    </ScreenContainer>
+  );
+}
+const styles = StyleSheet.create({
+  title: { fontSize: FontSize.xl, fontWeight: "800", color: Colors.primary, marginBottom: Spacing.md },
+  profileCard: { backgroundColor: Colors.surfaceLight, borderRadius: Radius.xl, padding: Spacing.xl, alignItems: "center", marginBottom: Spacing.md, ...Shadow.md },
+  name: { fontSize: FontSize.xl, fontWeight: "700", color: Colors.textPrimary, marginTop: 8 },
+  email: { fontSize: FontSize.sm, color: Colors.textSecondary },
+  card: { backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: 8, ...Shadow.sm },
+  cardTitle: { fontSize: FontSize.base, fontWeight: "700", color: Colors.textPrimary },
+  cardSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  signOutBtn: { alignItems: "center", padding: Spacing.md, marginTop: Spacing.md },
+  signOutText: { color: Colors.primary, fontWeight: "600" },
+});

@@ -1,0 +1,9 @@
+{
+  "name": "expo-app-monitor",
+  "version": "1.0.0",
+  "description": "Foreground app detection via Android AccessibilityService",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

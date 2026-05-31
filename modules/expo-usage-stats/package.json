@@ -1,0 +1,9 @@
+{
+  "name": "expo-usage-stats",
+  "version": "1.0.0",
+  "description": "Real app usage tracking via Android UsageStatsManager",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

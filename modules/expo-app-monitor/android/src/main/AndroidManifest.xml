@@ -1,0 +1,3 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Service is declared in the app's main AndroidManifest.xml via app.json plugin config -->
+</manifest>
