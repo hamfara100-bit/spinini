@@ -63,3 +63,5 @@ modules/*/build/
 build-log*.txt
 gradle-build*.log
 trystero-build*.log
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/assets/*.bundle
