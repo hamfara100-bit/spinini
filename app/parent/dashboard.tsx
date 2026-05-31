@@ -225,7 +225,6 @@ const PARENT_FEATURES: FeatureDef[] = [
 
   // Admin
   { id: "permissions",   emoji: "🔐", label: "Permissions",    ...C.admin               },
-  { id: "cloud-backup",  emoji: "☁️", label: "Cloud Backup",   ...C.admin               },
   { id: "account",       emoji: "👤", label: "Account",        ...C.admin               },
   { id: "settings",      emoji: "⚙️", label: "Settings",       ...C.admin               },
   { id: "help",          emoji: "❓", label: "Help & Privacy",  ...C.admin               },
@@ -237,7 +236,7 @@ const SECTIONS = [
   { label: "📚 School & Content", ids: ["fitness","chores","school-mgmt","learning-apps","wishes","reward-shop","achievements","important-info","medications","quiz","allowance","kid-requests","family-movies","family-music","family-books"] },
   { label: "💬 Family & Growth",  ids: ["communicate","funny-sounds","memories","stories","advice","apology","wellbeing","family-vote","social","family-calendar","co-parenting","family-tree","digital-agreement"] },
   { label: "✨ AI & Voice",       ids: ["agent","voice-commands","ai-results"] },
-  { label: "⚙️ Settings & Admin", ids: ["permissions","cloud-backup","account","settings","help","digest","quick-setup","widgets"] },
+  { label: "⚙️ Settings & Admin", ids: ["permissions","account","settings","help","digest","quick-setup","widgets"] },
 ];
 
 const featureMap = Object.fromEntries(PARENT_FEATURES.map(f => [f.id, f]));

@@ -6,19 +6,16 @@ import { useData } from "../../lib/data/store";
 import { hashPin } from "../../lib/utils";
 import { useColors } from "../../hooks/use-colors";
 import { PinPad } from "../../components/pin-pad";
-import { GoogleSignIn } from "../../components/google-sign-in";
 import { ScreenContainer } from "../../components/screen-container";
 import { Colors, FontSize, Radius, Spacing } from "../../lib/theme";
-import { GOOGLE_SCOPES } from "../../lib/google-auth";
-import type { GoogleAccount } from "../../lib/data/types";
 import MobileAds from "react-native-google-mobile-ads";
 import { AdMobBanner } from "../../components/admob-banner";
 import { ParentFindPhoneOverlay } from "../../components/parent-find-phone-overlay";
 
-type AuthMethod = "choose" | "pin" | "google";
+type AuthMethod = "choose" | "pin";
 
 export default function ParentLayout() {
-  const { state, dispatch } = useData();
+  const { state } = useData();
   const router = useRouter();
   const C = useColors();
   const insets = useSafeAreaInsets();
@@ -32,9 +29,7 @@ export default function ParentLayout() {
       .catch(() => {/* silent — ads unavailable on simulator */});
   }, []);
   const [error, setError] = useState("");
-  const [method, setMethod] = useState<AuthMethod>(
-    state.parentSettings.googleAccount ? "google" : "choose"
-  );
+  const [method, setMethod] = useState<AuthMethod>("choose");
 
   // Badge: total pending chore approvals + reward requests
   const totalPending = state.kids.reduce((sum, k) => {
@@ -51,12 +46,6 @@ export default function ParentLayout() {
     } else {
       setError("Wrong PIN. Try again.");
     }
-  }
-
-  function handleGoogleSuccess(account: GoogleAccount) {
-    // Save Google account for future use
-    dispatch({ type: "SET_PARENT_GOOGLE", account });
-    setUnlocked(true);
   }
 
   // Already unlocked — show tabs
@@ -116,12 +105,6 @@ export default function ParentLayout() {
             </TouchableOpacity>
           ) : null}
 
-          <TouchableOpacity style={[styles.methodBtn, styles.methodBtnGoogle]} onPress={() => setMethod("google")}>
-            <Text style={styles.methodEmoji}>G</Text>
-            <Text style={styles.methodLabel}>Google Account</Text>
-            <Text style={styles.methodSub}>Sign in with your Google account</Text>
-          </TouchableOpacity>
-
           {/* No PIN fallback — shown only if state hydrates after mount */}
           {!state.parentSettings.pin && (
             <TouchableOpacity style={styles.skipBtn} onPress={() => setUnlocked(true)}>
@@ -140,36 +123,6 @@ export default function ParentLayout() {
         </View>
       )}
 
-      {method === "google" && (
-        <View style={styles.googleSection}>
-          <Text style={styles.googleInstr}>Sign in with the Google account linked to this parent profile.</Text>
-          <GoogleSignIn
-            scopes={GOOGLE_SCOPES}
-            onSuccess={handleGoogleSuccess}
-            onError={msg => setError(msg)}
-            label="Sign in with Google"
-            existingAccount={state.parentSettings.googleAccount}
-            onSignOut={() => {
-              dispatch({ type: "CLEAR_PARENT_GOOGLE" });
-              setMethod("choose");
-            }}
-          />
-          {state.parentSettings.googleAccount && (
-            <TouchableOpacity
-              style={[styles.methodBtn, { marginTop: 16 }]}
-              onPress={() => setUnlocked(true)}
-            >
-              <Text style={{ fontWeight: "700", color: Colors.primary, textAlign: "center" }}>
-                ✓ Continue as {state.parentSettings.googleAccount.name}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <TouchableOpacity style={styles.backBtn} onPress={() => setMethod("choose")}>
-            <Text style={styles.backText}>← Other sign-in options</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </ScreenContainer>
   );
 }

@@ -7,11 +7,9 @@ import { useRouter } from "expo-router";
 import { useData } from "../lib/data/store";
 import { ScreenContainer } from "../components/screen-container";
 import { Mascot } from "../components/mascot";
-import { GoogleSignIn } from "../components/google-sign-in";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../lib/theme";
 import { PASTEL_COLORS } from "../lib/data/types";
-import { KID_SCOPES } from "../lib/google-auth";
-import type { GoogleAccount, KidState } from "../lib/data/types";
+import type { KidState } from "../lib/data/types";
 import * as AppleAuthentication from "expo-apple-authentication";
 
 function BlinkBadge({ count }: { count: number }) {
@@ -34,7 +32,6 @@ function BlinkBadge({ count }: { count: number }) {
 export default function ProfilePicker() {
   const { state, hydrated, dispatch } = useData();
   const router = useRouter();
-  const [googleKid, setGoogleKid] = useState<KidState | null>(null); // kid whose Google modal is open
   const [showParentModal, setShowParentModal] = useState(false);
 
   useEffect(() => {
@@ -53,26 +50,7 @@ export default function ProfilePicker() {
   if (!state.setupDone) return null;
 
   function selectKid(kid: KidState) {
-    // If this kid has a Google account linked, offer Google sign-in
-    if (kid.profile.googleAccount) {
-      setGoogleKid(kid);
-    } else if (kid.profile.pin) {
-      // Has PIN — go to kid home (PIN handled inside kid layout)
-      router.push(`/kid/${kid.profile.id}/home`);
-    } else {
-      router.push(`/kid/${kid.profile.id}/home`);
-    }
-  }
-
-  function handleKidGoogleSuccess(account: GoogleAccount, kid: KidState) {
-    // Update token in case it refreshed
-    dispatch({ type: "SET_KID_GOOGLE", kidId: kid.profile.id, account });
-    setGoogleKid(null);
-    router.push(`/kid/${kid.profile.id}/home`);
-  }
-
-  function skipGoogleAndEnter(kid: KidState) {
-    setGoogleKid(null);
+    // Enter the kid's home (any per-kid PIN is handled inside the kid layout).
     router.push(`/kid/${kid.profile.id}/home`);
   }
 
@@ -122,11 +100,6 @@ export default function ProfilePicker() {
               : <Mascot type={kid.profile.mascot} size={64} animate={false} />}
             <Text style={styles.kidName}>{kid.profile.name}</Text>
             <Text style={styles.kidAge}>Age {kid.profile.age}</Text>
-            {kid.profile.googleAccount && (
-              <View style={styles.googleBadge}>
-                <Text style={styles.googleBadgeText}>☁️ Google</Text>
-              </View>
-            )}
             {(() => {
               const n = kid.chores.filter(c => c.status === "open" || c.status === "submitted").length;
               return n > 0 ? <BlinkBadge count={n} /> : null;
@@ -206,58 +179,6 @@ export default function ProfilePicker() {
         </View>
       </Modal>
 
-      {/* Google sign-in modal for kids */}
-      <Modal
-        visible={!!googleKid}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setGoogleKid(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            {googleKid && (
-              <>
-                <Mascot type={googleKid.profile.mascot} size={56} animate />
-                <Text style={styles.modalTitle}>Hi, {googleKid.profile.name}! 👋</Text>
-                <Text style={styles.modalSub}>Sign in with your Google account to continue</Text>
-
-                <GoogleSignIn
-                  scopes={KID_SCOPES}
-                  onSuccess={acc => handleKidGoogleSuccess(acc, googleKid)}
-                  onError={msg => Alert.alert("Sign-in failed", msg)}
-                  label="Sign in with Google"
-                  existingAccount={
-                    // Check if tokens still valid
-                    googleKid.profile.googleAccount?.expiresAt &&
-                    googleKid.profile.googleAccount.expiresAt > Date.now()
-                      ? googleKid.profile.googleAccount
-                      : undefined
-                  }
-                />
-
-                {googleKid.profile.googleAccount?.expiresAt &&
-                  googleKid.profile.googleAccount.expiresAt > Date.now() && (
-                    <TouchableOpacity
-                      style={styles.continueBtn}
-                      onPress={() => skipGoogleAndEnter(googleKid)}
-                    >
-                      <Text style={styles.continueBtnText}>
-                        ✓ Continue as {googleKid.profile.googleAccount!.name}
-                      </Text>
-                    </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={styles.skipBtn}
-                  onPress={() => skipGoogleAndEnter(googleKid)}
-                >
-                  <Text style={styles.skipText}>Skip for now</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
     </ScreenContainer>
   );
 }

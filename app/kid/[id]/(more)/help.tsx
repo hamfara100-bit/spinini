@@ -14,12 +14,7 @@ import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { hashPin } from "../../../../lib/utils";
 import { PinPad } from "../../../../components/pin-pad";
-import { GoogleSignIn } from "../../../../components/google-sign-in";
-import { KID_SCOPES } from "../../../../lib/google-auth";
-import { backupKidToOwnDrive } from "../../../../lib/google-backup";
 import { useData } from "../../../../lib/data/store";
-import type { GoogleAccount } from "../../../../lib/data/types";
-import { getGoogleTokens } from "../../../../lib/secure-tokens";
 
 type Tab = "help" | "privacy";
 
@@ -76,44 +71,17 @@ async function requestPerms(requestCamera: () => Promise<any>): Promise<string[]
 }
 
 export default function HelpScreen() {
-  const { state, dispatch } = useData();
+  const { state } = useData();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [tab, setTab] = useState<Tab>("help");
   const [showPin, setShowPin] = useState(false);
   const [pinError, setPinError] = useState("");
-  const [backingUp, setBackingUp] = useState(false);
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [, requestCamera] = useCameraPermissions();
 
   const hasPin = !!state.parentSettings.pin;
-  const kid = state.kids.find(k => k.profile.id === id);
-  const kidGoogleAccount = kid?.profile.googleAccount;
-  const [kidAccessToken, setKidAccessToken] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!kidGoogleAccount?.id) { setKidAccessToken(null); return; }
-    getGoogleTokens(kidGoogleAccount.id).then(t => setKidAccessToken(t?.accessToken ?? null)).catch(() => {});
-  }, [kidGoogleAccount?.id]);
-
-  async function handleKidBackup() {
-    if (!kid || !kidAccessToken) return;
-    setBackingUp(true);
-    try {
-      await backupKidToOwnDrive(kidAccessToken, kid);
-      Alert.alert("✅ Backed Up!", `Your data is saved to Google Drive under "Spinini - ${kid.profile.name}/" 🎉`);
-    } catch {
-      Alert.alert("Backup Failed", "Couldn't reach Google Drive. Try again later.");
-    } finally {
-      setBackingUp(false);
-    }
-  }
-
-  function handleKidGoogleSuccess(account: GoogleAccount) {
-    if (!kid) return;
-    dispatch({ type: "SET_KID_GOOGLE", kidId: kid.profile.id, account });
-  }
 
   function handleSwitchToParent() {
     if (hasPin) {
@@ -238,31 +206,6 @@ export default function HelpScreen() {
           <View style={styles.contactCard}>
             <Text style={styles.contactText}>Need more help? Ask a parent or go to your 🤖 AI Buddy! 😊</Text>
           </View>
-
-          {/* Google Drive Backup */}
-          <Text style={styles.backupHeader}>☁️ My Google Drive Backup</Text>
-          {kidGoogleAccount ? (
-            <View style={styles.backupCard}>
-              <View style={styles.backupAccountRow}>
-                <Text style={{ fontSize: 22 }}>✅</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.backupAccountName}>{kidGoogleAccount.name}</Text>
-                  <Text style={styles.backupAccountEmail}>{kidGoogleAccount.email}</Text>
-                </View>
-              </View>
-              <Text style={styles.backupFolderNote}>
-                Saves to: <Text style={{ fontWeight: "700" }}>Spinini - {kid?.profile.name}/</Text> in your Google Drive
-              </Text>
-              <TouchableOpacity style={[styles.backupBtn, backingUp && { opacity: 0.7 }]} onPress={handleKidBackup} disabled={backingUp}>
-                {backingUp ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.backupBtnText}>☁️ Back Up My Data</Text>}
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.backupCard}>
-              <Text style={styles.backupPrompt}>Link your Google account to save your journal, drawings, school work, and reading list to your own Google Drive! 📚</Text>
-              <GoogleSignIn scopes={KID_SCOPES} onSuccess={handleKidGoogleSuccess} label="Link My Google Account" compact />
-            </View>
-          )}
         </>
       ) : (
         <>

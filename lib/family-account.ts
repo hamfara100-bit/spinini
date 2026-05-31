@@ -62,10 +62,9 @@ export async function signIn(username: string, password: string): Promise<void> 
  * `https://<project-ref>.supabase.co/auth/v1/callback`; and in Authentication →
  * URL Configuration → Redirect URLs, allow `famkids://*`.
  *
- * NOTE: this is login only. It does NOT grant Drive/Photos scopes — that backup
- * flow stays on the dedicated expo-auth-session path (components/google-sign-in
- * + lib/google-auth), which keeps the Google access token Supabase doesn't
- * persist.
+ * NOTE: this is login only — no Drive/Photos scopes are requested. Backups are
+ * fully local now (see lib/data-export.ts: export to a shareable .zip), so the
+ * app no longer needs any Google API scopes or client IDs.
  */
 export async function signInWithGoogle(): Promise<boolean> {
   const redirectTo = makeRedirectUri({ scheme: "famkids", path: "auth-callback" });

@@ -8,16 +8,14 @@ import { useAudioRecorder, useAudioPlayer, AudioModule, RecordingPresets } from 
 import { useData, useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Mascot } from "../../../../components/mascot";
-import { GoogleSignIn } from "../../../../components/google-sign-in";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { PASTEL_COLORS } from "../../../../lib/data/types";
 import { getTodayUsage, getRemainingMinutes, getBankBalance, formatMinutes, getStreak, isLocked } from "../../../../lib/data/logic";
 import { DurationPicker, DurationMinutes, tomorrowMidnight, minutesUntilMidnight } from "../../../../components/duration-picker";
-import { KID_SCOPES } from "../../../../lib/google-auth";
-import type { GoogleAccount, AgePreset, VoiceNote } from "../../../../lib/data/types";
+import type { AgePreset, VoiceNote } from "../../../../lib/data/types";
 import { uid, nowIso } from "../../../../lib/utils";
 
-type Tab = "overview" | "controls" | "voice" | "chores" | "google";
+type Tab = "overview" | "controls" | "voice" | "chores";
 
 // ─── Voice Note Player Row ────────────────────────────────────────────────────
 function VoiceNoteRow({
@@ -282,22 +280,6 @@ export default function ParentKidDetailScreen() {
     }
   }
 
-  function handleGoogleSuccess(account: GoogleAccount) {
-    dispatch({ type: "SET_KID_GOOGLE", kidId: id, account });
-    Alert.alert("✅ Connected!", `${profile.name}'s Google account is now linked.`);
-  }
-
-  function handleGoogleSignOut() {
-    Alert.alert(
-      "Disconnect Google",
-      `Remove Google account from ${profile.name}'s profile?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Disconnect", style: "destructive", onPress: () => dispatch({ type: "CLEAR_KID_GOOGLE", kidId: id }) },
-      ]
-    );
-  }
-
   function approveChore(choreId: string) {
     dispatch({ type: "UPDATE_CHORE", choreId, payload: { status: "approved" } });
   }
@@ -310,7 +292,6 @@ export default function ParentKidDetailScreen() {
     { id: "controls",  emoji: "🎛️", label: "Controls" },
     { id: "voice",     emoji: "🎙️", label: `Voice${unlistenedNotes ? ` (${unlistenedNotes})` : ""}` },
     { id: "chores",    emoji: "✅", label: `Chores${pendingChores.length ? ` (${pendingChores.length})` : ""}` },
-    { id: "google",    emoji: "☁️", label: "Google" },
   ];
 
   return (
@@ -321,9 +302,6 @@ export default function ParentKidDetailScreen() {
         <View style={{ flex: 1, marginLeft: 14 }}>
           <Text style={styles.name}>{profile.name}</Text>
           <Text style={styles.age}>Age {profile.age}</Text>
-          {profile.googleAccount && (
-            <Text style={styles.googleBadge}>☁️ {profile.googleAccount.email}</Text>
-          )}
         </View>
         <TouchableOpacity
           style={styles.editBtn}
@@ -595,33 +573,6 @@ export default function ParentKidDetailScreen() {
             </>
           )}
 
-          {tab === "google" && (
-            <>
-              <View style={styles.backupHeader}>
-                <Text style={{ fontSize: 40 }}>☁️</Text>
-                <Text style={styles.backupTitle}>Google Account & Backup</Text>
-                <Text style={styles.backupSub}>
-                  Link {profile.name}'s Google account to back up their data automatically.
-                </Text>
-              </View>
-              <Section title="Google Account">
-                <GoogleSignIn
-                  scopes={KID_SCOPES}
-                  onSuccess={handleGoogleSuccess}
-                  label={`Connect ${profile.name}'s Google Account`}
-                  existingAccount={profile.googleAccount}
-                  onSignOut={handleGoogleSignOut}
-                />
-              </Section>
-              {!profile.googleAccount && (
-                <View style={styles.noGoogleBox}>
-                  <Text style={styles.noGoogleText}>
-                    Without a Google account, data is stored only on this device and cannot be recovered if lost.
-                  </Text>
-                </View>
-              )}
-            </>
-          )}
 
           <View style={{ height: 40 }} />
         </ScrollView>
