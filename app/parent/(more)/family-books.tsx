@@ -4,7 +4,7 @@ import {
   StyleSheet, Modal, Alert, Linking,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { useData } from "../../../lib/data/store";
 import { uid } from "../../../lib/utils";
 import { Colors, FontSize, Radius, Spacing } from "../../../lib/theme";

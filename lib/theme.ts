@@ -13,6 +13,7 @@ export const Colors = {
   bgDark: "#0E0B1F",
   background: "#FAF7FF",  // alias for bgLight
   surfaceLight: "#FFFFFF",
+  surface: "#FFFFFF",  // alias for surfaceLight
   surfaceDark: "#1A1633",
   cardLight: "#F3EEFF",
   cardDark: "#241D40",
@@ -46,6 +47,7 @@ export const Radius = {
   md: 12,
   lg: 16,
   xl: 24,
+  xxl: 32,
   full: 999,
 };
 

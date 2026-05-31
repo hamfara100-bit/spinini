@@ -7,6 +7,7 @@ import { useData } from "../../../lib/data/store";
 import { uid, nowIso } from "../../../lib/utils";
 import { Colors, FontSize, Radius, Spacing } from "../../../lib/theme";
 import { ScreenContainer } from "../../../components/screen-container";
+import { Mascot } from "../../../components/mascot";
 import { useColors } from "../../../hooks/use-colors";
 
 export default function ParentFindPhoneScreen() {
@@ -86,7 +87,7 @@ export default function ParentFindPhoneScreen() {
             return (
               <View key={k.profile.id} style={[styles.kidCard, { backgroundColor: C.surface, borderColor: C.border }]}>
                 <View style={styles.kidRow}>
-                  <Text style={styles.kidAvatar}>{k.profile.avatar ?? "🧒"}</Text>
+                  <Mascot type={k.profile.mascot} size={36} animate={false} />
                   <View style={styles.kidInfo}>
                     <Text style={[styles.kidName, { color: C.textPrimary }]}>{k.profile.name}</Text>
                     <Text style={[styles.kidAge, { color: C.textSecondary }]}>Age {k.profile.age}</Text>

@@ -12,6 +12,7 @@ import { AudioModule } from "expo-audio";
 import { useCameraPermissions } from "expo-camera";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
+import { hashPin } from "../../../../lib/utils";
 import { PinPad } from "../../../../components/pin-pad";
 import { GoogleSignIn } from "../../../../components/google-sign-in";
 import { KID_SCOPES } from "../../../../lib/google-auth";
