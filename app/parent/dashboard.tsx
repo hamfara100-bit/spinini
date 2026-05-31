@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Modal, Alert, Dimensions, AppState as RNAppState } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Animated, Modal, Alert, Dimensions, AppState as RNAppState } from "react-native";
 import { MonetizationModal } from "../../components/monetization-modal";
 import { AdMobBanner } from "../../components/admob-banner";
 import { aggregateWebUsage, aggregateAppUsage, aggregateFeatureTaps, daysAgoDate, fmtDuration } from "../../lib/usage-tracker";
@@ -7,7 +7,11 @@ import { aggregateWebUsage, aggregateAppUsage, aggregateFeatureTaps, daysAgoDate
 const { width: SCREEN_W } = Dimensions.get("window");
 const GRID_H_PAD = 16;
 const GRID_GAP   = 10;
-const CARD_W     = Math.floor((SCREEN_W - GRID_H_PAD * 2 - GRID_GAP * 2) / 3);
+// Keep tiles phone-sized (~108px) on every screen: 3 columns on a phone, more
+// columns on a tablet. Hardcoding 3 columns made tablet tiles balloon to ~380px.
+const TARGET_TILE = 108;
+const GRID_COLS  = Math.max(3, Math.floor((SCREEN_W - GRID_H_PAD * 2 + GRID_GAP) / (TARGET_TILE + GRID_GAP)));
+const CARD_W     = Math.floor((SCREEN_W - GRID_H_PAD * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS);
 import { useRouter } from "expo-router";
 import { useData } from "../../lib/data/store";
 import { useColors } from "../../hooks/use-colors";
@@ -342,6 +346,7 @@ export default function ParentDashboard() {
   const isAdFree   = state.parentSettings.adFree ?? false;
   // Show the full-screen disclosure on first ever launch; suppress after that
   const [showMonetModal, setShowMonetModal] = useState(!hasSeenAd);
+  const [search, setSearch] = useState("");
 
   const totalUsageToday = state.kids.reduce((sum, k) => sum + getTodayUsage(k), 0);
   const unackedSos = (state.sosAlerts ?? []).filter(a => !a.acknowledged);
@@ -354,6 +359,33 @@ export default function ParentDashboard() {
 
   let cardIndex = 0;
   const installAlertCount = state.kids.reduce((n, k) => n + (k.installAlerts?.length ?? 0), 0);
+
+  // Feature search: when there's a query, show one flat grid of matches instead
+  // of the grouped sections (e.g. "ga" → Game Night, ...). Matches label OR id.
+  const q = search.trim().toLowerCase();
+  const searchResults = q
+    ? PARENT_FEATURES.filter(f => f.label.toLowerCase().includes(q) || f.id.toLowerCase().includes(q))
+    : [];
+
+  const renderFeatureTile = (feature: FeatureDef) => {
+    const idx = cardIndex++;
+    const route = feature.id === "agent"
+      ? "/parent/agent"
+      : feature.id === "web-allowlist"
+      ? "/parent/(more)/dns-filter"
+      : `/parent/(more)/${feature.id}`;
+    const badge = feature.id === "remote-apps" ? installAlertCount : undefined;
+    return (
+      <AnimatedFeatureCard
+        key={feature.id}
+        feature={feature}
+        index={idx}
+        width={CARD_W}
+        badge={badge}
+        onPress={() => router.push(route as any)}
+      />
+    );
+  };
 
   return (
     <ScreenContainer scroll>
@@ -608,36 +640,52 @@ export default function ParentDashboard() {
         </View>
       )}
 
-      {/* Feature Sections */}
-      {SECTIONS.map(section => {
-        const sectionFeatures = section.ids.map(id => featureMap[id]).filter(Boolean);
-        return (
-          <View key={section.label} style={styles.featureSection}>
-            <Text style={[styles.featureSectionLabel, { color: C.textSub }]}>{section.label}</Text>
-            <View style={styles.grid}>
-              {sectionFeatures.map(feature => {
-                const idx = cardIndex++;
-                const route = feature.id === "agent"
-                  ? "/parent/agent"
-                  : feature.id === "web-allowlist"
-                  ? "/parent/(more)/dns-filter"
-                  : `/parent/(more)/${feature.id}`;
-                const badge = feature.id === "remote-apps" ? installAlertCount : undefined;
-                return (
-                  <AnimatedFeatureCard
-                    key={feature.id}
-                    feature={feature}
-                    index={idx}
-                    width={CARD_W}
-                    badge={badge}
-                    onPress={() => router.push(route as any)}
-                  />
-                );
-              })}
+      {/* Feature search */}
+      <View style={[styles.searchWrap, { backgroundColor: C.card, borderColor: C.border }]}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={[styles.searchInput, { color: C.text }]}
+          placeholder="Search tools…  (try 'ga' for Game Night)"
+          placeholderTextColor={C.textSub}
+          value={search}
+          onChangeText={setSearch}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[styles.searchClear, { color: C.textSub }]}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {q ? (
+        /* Search results — one flat grid */
+        <View style={styles.featureSection}>
+          <Text style={[styles.featureSectionLabel, { color: C.textSub }]}>
+            🔍 {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for “{search.trim()}”
+          </Text>
+          {searchResults.length === 0 ? (
+            <Text style={[styles.searchEmpty, { color: C.textSub }]}>No tools match — try fewer letters.</Text>
+          ) : (
+            <View style={styles.grid}>{searchResults.map(renderFeatureTile)}</View>
+          )}
+        </View>
+      ) : (
+        /* Feature Sections */
+        SECTIONS.map(section => {
+          const sectionFeatures = section.ids.map(id => featureMap[id]).filter(Boolean);
+          return (
+            <View key={section.label} style={styles.featureSection}>
+              <Text style={[styles.featureSectionLabel, { color: C.textSub }]}>{section.label}</Text>
+              <View style={styles.grid}>
+                {sectionFeatures.map(renderFeatureTile)}
+              </View>
             </View>
-          </View>
-        );
-      })}
+          );
+        })
+      )}
     </ScreenContainer>
   );
 }
@@ -748,6 +796,17 @@ const styles = StyleSheet.create({
     marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5,
   },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP, marginBottom: 4 },
+
+  // Feature search
+  searchWrap: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    borderRadius: Radius.lg, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 4,
+    marginBottom: Spacing.md, ...Shadow.sm,
+  },
+  searchIcon: { fontSize: 16 },
+  searchInput: { flex: 1, fontSize: FontSize.base, paddingVertical: 10 },
+  searchClear: { fontSize: 16, fontWeight: "800", paddingHorizontal: 4 },
+  searchEmpty: { fontSize: FontSize.sm, fontStyle: "italic", paddingVertical: 8 },
 
   // Most Used section
   mostUsedSection: { marginBottom: Spacing.lg },

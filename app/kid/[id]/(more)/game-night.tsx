@@ -9,9 +9,9 @@
  * (Checkers, Chess, and the Trash card game land in follow-up passes.)
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Animated, Easing,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useData, useKid } from "../../../../lib/data/store";
@@ -508,19 +508,95 @@ function findOwnKing(board: ChessState["board"], seat: Seat): [number, number] |
 }
 
 // ─── Trash (Garbage) ──────────────────────────────────────────────────────────
+// ─── Playing-card visual (Trash) ──────────────────────────────────────────────
+function PlayingCard({
+  rank, suit, faceDown, size = "md", style,
+}: {
+  rank?: number; suit?: string; faceDown?: boolean;
+  size?: "sm" | "md" | "lg"; style?: any;
+}) {
+  const d = size === "lg" ? { w: 86, h: 122, corner: 22, pip: 46 }
+          : size === "md" ? { w: 60, h: 84, corner: 15, pip: 30 }
+          : { w: 44, h: 62, corner: 12, pip: 24 };
+  if (faceDown) {
+    return (
+      <View style={[cs.card, cs.cardBack, { width: d.w, height: d.h }, style]}>
+        <View style={cs.backInner}><Text style={[cs.backGlyph, { fontSize: d.pip }]}>✦</Text></View>
+      </View>
+    );
+  }
+  const red = suit === "♥" || suit === "♦";
+  const color = red ? "#DC2626" : "#1A1033";
+  const label = rank ? trashRankLabel(rank) : "";
+  return (
+    <View style={[cs.card, { width: d.w, height: d.h }, style]}>
+      <Text style={[cs.corner, cs.cornerTL, { color, fontSize: d.corner }]}>{label}{suit}</Text>
+      <Text style={[cs.pip, { color, fontSize: d.pip }]}>{suit}</Text>
+      <Text style={[cs.corner, cs.cornerBR, { color, fontSize: d.corner }]}>{label}{suit}</Text>
+    </View>
+  );
+}
+
+// A numbered slot in a player's row — springs in when its card lands.
+function TrashSlot({ index, card, active }: { index: number; card: TrashCard | null; active: boolean }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const wasFilled = useRef(!!card);
+  useEffect(() => {
+    if (!!card && !wasFilled.current) {
+      scale.setValue(0.1);
+      Animated.spring(scale, { toValue: 1, friction: 5, tension: 140, useNativeDriver: true }).start();
+    }
+    wasFilled.current = !!card;
+  }, [card]);
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      {card ? (
+        <PlayingCard rank={card.rank} suit={card.suit} size="sm" />
+      ) : (
+        <View style={[cs.slotEmpty, active && cs.slotEmptyActive]}>
+          <Text style={cs.slotNum}>{index + 1}</Text>
+        </View>
+      )}
+    </Animated.View>
+  );
+}
+
 function Trash({ sideNames, resetKey, onResult, onTurnChange }: GameProps) {
   const [game, setGame] = useState<TrashState>(() => trashInit());
   const [over, setOver] = useState(false);
   const [log, setLog] = useState<string>("Tap a pile to draw and play your turn.");
+  const [drawn, setDrawn] = useState<TrashCard | null>(null);
   const turn = game.turn;
 
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const stockPulse = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    setGame(trashInit()); setOver(false); setLog("Tap a pile to draw and play your turn.");
+    setGame(trashInit()); setOver(false); setDrawn(null);
+    setLog("Tap a pile to draw and play your turn.");
   }, [resetKey]);
+
+  // Gentle breathing pulse on the stock so the board feels alive.
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(stockPulse, { toValue: 1.06, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(stockPulse, { toValue: 1,    duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
 
   function play(source: "stock" | "discard") {
     if (over) return;
     const res = trashTurn(game, turn, source);
+
+    // Float the drawn card up before the new board settles.
+    setDrawn(res.drawn);
+    floatAnim.setValue(0);
+    Animated.timing(floatAnim, {
+      toValue: 1, duration: 850, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    }).start(() => setDrawn(null));
+
     setGame(res.state);
     const placedTxt = res.placed.length > 0 ? `placed ${res.placed.map(p => p + 1).join(", ")}` : "no spot";
     if (res.winner !== null) {
@@ -536,47 +612,67 @@ function Trash({ sideNames, resetKey, onResult, onTurnChange }: GameProps) {
   const topDiscard = game.discard[game.discard.length - 1];
 
   return (
-    <View style={{ alignItems: "center" }}>
+    <View style={{ alignItems: "center", width: "100%" }}>
       <TurnBanner sideNames={sideNames} turn={turn} over={over} />
+
       {[0, 1].map(si => {
         const seat = si as Seat;
         const p = game.players[seat];
+        const isActive = turn === seat && !over;
         return (
-          <View key={si} style={[gs.trRowWrap, turn === seat && !over && gs.trRowActive]}>
-            <Text style={[gs.trRowLabel, { color: SEAT_COLOR[seat] }]}>{sideNames[seat]}</Text>
-            <View style={gs.trSlots}>
+          <View key={si} style={[cs.row, isActive && cs.rowActive]}>
+            <Text style={[cs.rowLabel, { color: SEAT_COLOR[seat] }]}>{sideNames[seat]}</Text>
+            <View style={cs.slots}>
               {p.slots.map((card, i) => (
-                <View key={i} style={[gs.trSlot, card && gs.trSlotDone]}>
-                  {card ? (
-                    <Text style={gs.trSlotCard}>{trashRankLabel(card.rank)}{card.suit}</Text>
-                  ) : (
-                    <Text style={gs.trSlotNum}>{i + 1}</Text>
-                  )}
-                </View>
+                <TrashSlot key={i} index={i} card={card} active={isActive} />
               ))}
             </View>
           </View>
         );
       })}
 
-      <View style={gs.trPiles}>
-        <TouchableOpacity style={[gs.trPile, gs.trStock]} onPress={() => play("stock")} disabled={over} activeOpacity={0.85}>
-          <Text style={gs.trPileBack}>🂠</Text>
-          <Text style={gs.trPileLabel}>Draw Stock</Text>
-          <Text style={gs.trPileCount}>{game.stock.length} left</Text>
-        </TouchableOpacity>
+      <View style={cs.piles}>
+        <Animated.View style={{ transform: [{ scale: stockPulse }] }}>
+          <TouchableOpacity style={cs.pileBtn} onPress={() => play("stock")} disabled={over} activeOpacity={0.8}>
+            <PlayingCard faceDown size="lg" />
+            <Text style={cs.pileLabel}>Draw Stock</Text>
+            <Text style={cs.pileCount}>{game.stock.length} left</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
         <TouchableOpacity
-          style={[gs.trPile, gs.trDiscard, !topDiscard && gs.trPileDisabled]}
+          style={[cs.pileBtn, (over || !topDiscard) && cs.pileDisabled]}
           onPress={() => play("discard")}
           disabled={over || !topDiscard}
-          activeOpacity={0.85}
+          activeOpacity={0.8}
         >
-          <Text style={gs.trPileTop}>{topDiscard ? `${trashRankLabel(topDiscard.rank)}${topDiscard.suit}` : "—"}</Text>
-          <Text style={gs.trPileLabel}>Take Discard</Text>
-          <Text style={gs.trPileCount}>{game.discard.length} cards</Text>
+          {topDiscard ? (
+            <PlayingCard rank={topDiscard.rank} suit={topDiscard.suit} size="lg" />
+          ) : (
+            <View style={cs.pileEmpty}><Text style={cs.pileEmptyText}>—</Text></View>
+          )}
+          <Text style={cs.pileLabel}>Take Discard</Text>
+          <Text style={cs.pileCount}>{game.discard.length} cards</Text>
         </TouchableOpacity>
+
+        {drawn && (
+          <Animated.View
+            pointerEvents="none"
+            style={[cs.floatCard, {
+              opacity: floatAnim.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] }),
+              transform: [
+                { translateY: floatAnim.interpolate({ inputRange: [0, 1], outputRange: [10, -64] }) },
+                { scale: floatAnim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.5, 1.15, 1] }) },
+                { rotate: floatAnim.interpolate({ inputRange: [0, 1], outputRange: ["-8deg", "6deg"] }) },
+              ],
+            }]}
+          >
+            <PlayingCard rank={drawn.rank} suit={drawn.suit} size="lg" />
+          </Animated.View>
+        )}
       </View>
-      <Text style={gs.trLog}>{log}</Text>
+
+      <Text style={cs.log}>{log}</Text>
     </View>
   );
 }
@@ -1085,23 +1181,53 @@ const gs = StyleSheet.create({
   chDot: { position: "absolute", width: 14, height: 14, borderRadius: 7, backgroundColor: "rgba(0,0,0,0.35)" },
   chCapture: { position: "absolute", width: 38, height: 38, borderRadius: 19, borderWidth: 4, borderColor: "rgba(0,0,0,0.35)" },
 
-  // Trash
-  trRowWrap: { width: "100%", borderRadius: 12, padding: 8, marginBottom: 8, borderWidth: 2, borderColor: "transparent" },
-  trRowActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + "0C" },
-  trRowLabel: { fontSize: 13, fontWeight: "800", marginBottom: 6 },
-  trSlots: { flexDirection: "row", flexWrap: "wrap", gap: 4, justifyContent: "center" },
-  trSlot: { width: 30, height: 40, borderRadius: 6, backgroundColor: Colors.surfaceLight, borderWidth: 1.5, borderColor: Colors.border, alignItems: "center", justifyContent: "center" },
-  trSlotDone: { backgroundColor: Colors.success + "22", borderColor: Colors.success },
-  trSlotNum: { fontSize: 12, color: Colors.textMuted, fontWeight: "700" },
-  trSlotCard: { fontSize: 13, fontWeight: "900", color: Colors.textPrimary },
-  trPiles: { flexDirection: "row", gap: 16, marginTop: 8 },
-  trPile: { width: 110, borderRadius: 14, alignItems: "center", paddingVertical: 12, borderWidth: 2 },
-  trStock: { backgroundColor: Colors.primary + "12", borderColor: Colors.primary },
-  trDiscard: { backgroundColor: Colors.warning + "12", borderColor: Colors.warning },
-  trPileDisabled: { opacity: 0.4 },
-  trPileBack: { fontSize: 30 },
-  trPileTop: { fontSize: 26, fontWeight: "900", color: Colors.textPrimary, height: 36 },
-  trPileLabel: { fontSize: 13, fontWeight: "800", color: Colors.textPrimary, marginTop: 2 },
-  trPileCount: { fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
-  trLog: { fontSize: 12, color: Colors.textSecondary, marginTop: 12, textAlign: "center", lineHeight: 17, minHeight: 34, paddingHorizontal: 8 },
+});
+
+// ─── Trash card visuals ───────────────────────────────────────────────────────
+const cs = StyleSheet.create({
+  // Card face
+  card: {
+    borderRadius: 9, backgroundColor: "#fff", borderWidth: 1, borderColor: "#E5E7EB",
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3,
+  },
+  cardBack: { backgroundColor: "#5B3FA8", borderColor: "#4C2F94" },
+  backInner: {
+    flex: 1, alignSelf: "stretch", margin: 5, borderRadius: 6,
+    borderWidth: 2, borderColor: "rgba(255,255,255,0.35)",
+    alignItems: "center", justifyContent: "center",
+  },
+  backGlyph: { color: "rgba(255,255,255,0.55)", fontWeight: "900" },
+  corner: { position: "absolute", fontWeight: "900" },
+  cornerTL: { top: 3, left: 5 },
+  cornerBR: { bottom: 3, right: 5, transform: [{ rotate: "180deg" }] },
+  pip: { fontWeight: "800" },
+
+  // Player row
+  row: { width: "100%", borderRadius: 14, padding: 10, marginBottom: 10, borderWidth: 2, borderColor: "transparent" },
+  rowActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + "0C" },
+  rowLabel: { fontSize: 14, fontWeight: "800", marginBottom: 8 },
+  slots: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
+  slotEmpty: {
+    width: 44, height: 62, borderRadius: 9, backgroundColor: Colors.surfaceLight,
+    borderWidth: 1.5, borderColor: Colors.border, borderStyle: "dashed",
+    alignItems: "center", justifyContent: "center",
+  },
+  slotEmptyActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + "10" },
+  slotNum: { fontSize: 15, color: Colors.textMuted, fontWeight: "800" },
+
+  // Draw piles
+  piles: { flexDirection: "row", gap: 28, marginTop: 14, alignItems: "flex-start", justifyContent: "center", minHeight: 150 },
+  pileBtn: { alignItems: "center", gap: 4 },
+  pileDisabled: { opacity: 0.4 },
+  pileEmpty: {
+    width: 86, height: 122, borderRadius: 9, borderWidth: 2, borderStyle: "dashed",
+    borderColor: Colors.border, alignItems: "center", justifyContent: "center",
+  },
+  pileEmptyText: { fontSize: 28, color: Colors.textMuted },
+  pileLabel: { fontSize: 13, fontWeight: "800", color: Colors.textPrimary, marginTop: 4 },
+  pileCount: { fontSize: 11, color: Colors.textSecondary },
+  floatCard: { position: "absolute", top: -8, left: "50%", marginLeft: -43 },
+
+  log: { fontSize: 12.5, color: Colors.textSecondary, marginTop: 14, textAlign: "center", lineHeight: 18, minHeight: 36, paddingHorizontal: 8 },
 });

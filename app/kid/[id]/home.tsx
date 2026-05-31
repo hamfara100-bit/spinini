@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated, Alert, Dimensions, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Modal, Animated, Alert, Dimensions, ScrollView, Platform } from "react-native";
 import * as MediaLibrary from "expo-media-library";
 import { captureRef } from "react-native-view-shot";
 import { aggregateWebUsage, aggregateAppUsage, aggregateFeatureTaps, daysAgoDate } from "../../../lib/usage-tracker";
@@ -7,8 +7,9 @@ import { aggregateWebUsage, aggregateAppUsage, aggregateFeatureTaps, daysAgoDate
 const { width: SCREEN_W } = Dimensions.get("window");
 const GRID_H_PAD = 16;  // matches ScreenContainer paddingHorizontal
 const GRID_GAP   = 10;
-// Card width for 3-per-row with space-evenly: ~29% of available width
-const CARD_W     = Math.floor((SCREEN_W - GRID_H_PAD * 2) * 0.29);
+// Card width for 3-per-row with space-evenly: ~29% of available width, capped so
+// tiles don't balloon on a tablet (space-evenly just flows more per row instead).
+const CARD_W     = Math.min(120, Math.floor((SCREEN_W - GRID_H_PAD * 2) * 0.29));
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Speech from "expo-speech";
 import * as Location from "expo-location";
@@ -278,16 +279,17 @@ const FEATURES: FeatureDef[] = [
   { id: "help",           emoji: "❓", label: "Help & Privacy",  ...C.misc                 },
 ];
 
-// Category section headers for grouping
+// Category section headers for grouping. Like the parent dashboard, EVERY
+// feature lives in a purpose-based bucket — no "misc / new" catch-all — so the
+// grid reads as a clean, predictable set of categories.
 const SECTIONS = [
-  { label: "🎨 Create & Express", ids: ["create","journal","ideas","gadgets"] },
-  { label: "⚡ Apps & Tools",     ids: ["apps","alarms","vault"] },
-  { label: "💬 Family & Friends", ids: ["communicate","album","watch","remote-session","apology","wellbeing","family-vote","social","game-night"] },
+  { label: "🎨 Create & Express", ids: ["create","journal","ideas","gadgets","favorites"] },
+  { label: "📚 School & Learn",   ids: ["school","homework-helper","browser","calculator","reading-list","quiz","family-books","family-movies","family-music"] },
+  { label: "🏆 Rewards & Goals",  ids: ["rewards","chores","morning-routine","borrow-time","money","wishes","achievements","trophy-room","fitness"] },
+  { label: "💬 Family & Friends", ids: ["communicate","contacts","album","watch","remote-session","game-night","family-vote","social","family-calendar","mood","wellbeing","apology","request"] },
   { label: "✨ Smart & AI",       ids: ["buddy","stories","sounds","advice","voice-changer"] },
-  { label: "📚 School & Learn",   ids: ["school","browser","calculator","reading-list","quiz","homework-helper","family-movies","family-music","family-books"] },
-  { label: "🏆 Rewards & Goals",  ids: ["rewards","chores","wishes","money","favorites","achievements","fitness"] },
-  { label: "🌟 New Features",     ids: ["morning-routine","borrow-time","family-calendar","trophy-room","mood","request","my-reports"] },
-  { label: "🚨 Safety & Help",    ids: ["find-phone","incident","important-info","checkin","help"] },
+  { label: "⚡ Apps & Tools",     ids: ["apps","alarms","vault","my-reports"] },
+  { label: "🚨 Safety & Help",    ids: ["find-phone","checkin","incident","important-info","help"] },
 ];
 
 const featureMap = Object.fromEntries(FEATURES.map(f => [f.id, f]));
@@ -383,6 +385,7 @@ export default function KidHome() {
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [tick, setTick] = useState(0);
   const [sosLoading, setSosLoading] = useState(false);
+  const [search, setSearch] = useState("");
   // #7 Smart bedtime dimming
   const dimAnim = useRef(new Animated.Value(0)).current;
   // #9 Snapshot ref
@@ -697,6 +700,50 @@ export default function KidHome() {
   // ── Normal home ─────────────────────────────────────────────────────────────
   let cardIndex = 0;
 
+  // Feature search: a query shows one flat grid of matching tiles instead of the
+  // grouped sections (e.g. "ga" → Game Night). Matches the label or the id.
+  const q = search.trim().toLowerCase();
+  const searchResults: FeatureDef[] = q
+    ? FEATURES.filter(f => f.label.toLowerCase().includes(q) || f.id.toLowerCase().includes(q))
+    : [];
+
+  const renderTile = (feature: FeatureDef) => {
+    const idx = cardIndex++;
+    const isFeatureLocked = !kid.rules.freeMode &&
+      !ALWAYS_OPEN.has(feature.id) &&
+      (kid.rules.lockedFeatures ?? []).includes(feature.id);
+    const linkedChore = isFeatureLocked
+      ? kid.chores.find(c => c.status === "open" && c.unlocksFeatures?.includes(feature.id))
+      : undefined;
+    return (
+      <View key={feature.id} style={{ position: "relative" }}>
+        <AnimatedFeatureCard
+          feature={isFeatureLocked
+            ? { ...feature, bg: "#9CA3AF", shadow: "#374151", pulse: false }
+            : feature}
+          index={idx}
+          width={CARD_W}
+          onPress={() => {
+            if (isFeatureLocked) {
+              setLockedFeature({
+                id: feature.id,
+                label: feature.label,
+                unlockMsg: linkedChore?.unlockMessage ?? linkedChore?.title,
+              });
+            } else {
+              router.push(`/kid/${id}/(more)/${feature.id}` as any);
+            }
+          }}
+        />
+        {isFeatureLocked && (
+          <View style={styles.lockOverlay} pointerEvents="none">
+            <Text style={styles.lockOverlayIcon}>🔒</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <View style={{ flex: 1 }}>
     <ScreenContainer scroll bg={bg}>
@@ -866,57 +913,51 @@ export default function KidHome() {
         if (feat) router.push(`/kid/${kid.profile.id}/(more)/${featureId}`);
       }} />
 
-      {/* Feature Sections */}
-      {SECTIONS.map(section => {
-        const sectionFeatures = section.ids.map(fid => featureMap[fid]).filter(Boolean);
-        if (sectionFeatures.length === 0) return null;
-        return (
-          <View key={section.label} style={styles.section}>
-            <Text style={styles.sectionLabel}>{section.label}</Text>
-            <View style={styles.grid}>
-              {sectionFeatures.map(feature => {
-                const idx = cardIndex++;
-                const isFeatureLocked = !kid.rules.freeMode &&
-                  !ALWAYS_OPEN.has(feature.id) &&
-                  (kid.rules.lockedFeatures ?? []).includes(feature.id);
+      {/* Feature search */}
+      <View style={[styles.searchWrap, { backgroundColor: theme.surface }]}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={[styles.searchInput, { color: theme.text }]}
+          placeholder="Search… try 'ga' for Game Night"
+          placeholderTextColor={theme.textSub}
+          value={search}
+          onChangeText={setSearch}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[styles.searchClear, { color: theme.textSub }]}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
-                // Find chore that unlocks this feature (for the tooltip message)
-                const linkedChore = isFeatureLocked
-                  ? kid.chores.find(c => c.status === "open" && c.unlocksFeatures?.includes(feature.id))
-                  : undefined;
-
-                return (
-                  <View key={feature.id} style={{ position: "relative" }}>
-                    <AnimatedFeatureCard
-                      feature={isFeatureLocked
-                        ? { ...feature, bg: "#9CA3AF", shadow: "#374151", pulse: false }
-                        : feature}
-                      index={idx}
-                      width={CARD_W}
-                      onPress={() => {
-                        if (isFeatureLocked) {
-                          setLockedFeature({
-                            id: feature.id,
-                            label: feature.label,
-                            unlockMsg: linkedChore?.unlockMessage ?? linkedChore?.title,
-                          });
-                        } else {
-                          router.push(`/kid/${id}/(more)/${feature.id}` as any);
-                        }
-                      }}
-                    />
-                    {isFeatureLocked && (
-                      <View style={styles.lockOverlay} pointerEvents="none">
-                        <Text style={styles.lockOverlayIcon}>🔒</Text>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
+      {q ? (
+        /* Search results — one flat grid */
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>🔍 {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}</Text>
+          {searchResults.length === 0 ? (
+            <Text style={[styles.searchEmpty, { color: theme.textSub }]}>Nothing found — try fewer letters.</Text>
+          ) : (
+            <View style={styles.grid}>{searchResults.map(renderTile)}</View>
+          )}
+        </View>
+      ) : (
+        /* Feature Sections */
+        SECTIONS.map(section => {
+          const sectionFeatures = section.ids.map(fid => featureMap[fid]).filter(Boolean);
+          if (sectionFeatures.length === 0) return null;
+          return (
+            <View key={section.label} style={styles.section}>
+              <Text style={styles.sectionLabel}>{section.label}</Text>
+              <View style={styles.grid}>
+                {sectionFeatures.map(renderTile)}
+              </View>
             </View>
-          </View>
-        );
-      })}
+          );
+        })
+      )}
 
       {/* Voice notes modal */}
       <VoiceNotesModal
@@ -1059,6 +1100,15 @@ const styles = StyleSheet.create({
   section: { marginBottom: Spacing.md },
   sectionLabel: { fontSize: FontSize.sm, fontWeight: "700", color: Colors.textSecondary, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-evenly", rowGap: GRID_GAP },
+  searchWrap: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.border,
+    paddingHorizontal: 14, paddingVertical: 4, marginBottom: Spacing.md, ...Shadow.sm,
+  },
+  searchIcon: { fontSize: 16 },
+  searchInput: { flex: 1, fontSize: FontSize.base, paddingVertical: 10 },
+  searchClear: { fontSize: 16, fontWeight: "800", paddingHorizontal: 4 },
+  searchEmpty: { fontSize: FontSize.sm, fontStyle: "italic", paddingVertical: 8 },
 
   // Bedtime mode
   bedtimeHeader: { alignItems: "center", paddingTop: Spacing.xl, paddingBottom: Spacing.md },

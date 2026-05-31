@@ -106,7 +106,7 @@ export function AnimatedFeatureCard({ feature, onPress, size = "md", index = 0, 
         </View>
 
         {/* Label */}
-        <Text style={[styles.label, { fontSize: labelSz }]} numberOfLines={2}>
+        <Text style={[styles.label, { fontSize: labelSz, lineHeight: Math.round(labelSz * 1.25) }]} numberOfLines={2}>
           {feature.label}
         </Text>
 
@@ -165,7 +165,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "rgba(20,10,40,0.82)",
     textAlign: "center",
-    lineHeight: 13,
     letterSpacing: 0.1,
     paddingHorizontal: 2,
   },
