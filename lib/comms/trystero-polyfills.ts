@@ -65,6 +65,69 @@ if (typeof g.TextDecoder === "undefined") g.TextDecoder = TD;
 if (typeof g.addEventListener === "undefined") g.addEventListener = () => {};
 if (typeof g.removeEventListener === "undefined") g.removeEventListener = () => {};
 
+// ─── DOM Event / CustomEvent / EventTarget (the "Property 'Event' doesn't exist" blocker) ──
+// react-native-webrtc's RTCPeerConnection dispatches DOM-style events (it does
+// `new Event(...)` / dispatchEvent) the instant signaling starts — e.g. right
+// after setLocalDescription fires icecandidate/negotiationneeded. Hermes ships
+// NO global Event, CustomEvent, or EventTarget, so the first dispatch throws
+// "ReferenceError: Property 'Event' doesn't exist" and the JS thread dies. These
+// minimal pure-JS shims satisfy the contract react-native-webrtc relies on.
+// MUST be defined BEFORE registerGlobals() wires up the WebRTC classes below.
+if (typeof g.Event === "undefined") {
+  g.Event = class Event {
+    type: string;
+    bubbles: boolean;
+    cancelable: boolean;
+    defaultPrevented = false;
+    timeStamp = Date.now();
+    target: any = null;
+    currentTarget: any = null;
+    constructor(type: string, opts?: { bubbles?: boolean; cancelable?: boolean }) {
+      this.type = type;
+      this.bubbles = !!opts?.bubbles;
+      this.cancelable = !!opts?.cancelable;
+    }
+    preventDefault() { this.defaultPrevented = true; }
+    stopPropagation() {}
+    stopImmediatePropagation() {}
+  };
+}
+if (typeof g.CustomEvent === "undefined") {
+  g.CustomEvent = class CustomEvent extends g.Event {
+    detail: any;
+    constructor(type: string, opts?: { detail?: any; bubbles?: boolean; cancelable?: boolean }) {
+      super(type, opts);
+      this.detail = opts?.detail ?? null;
+    }
+  };
+}
+if (typeof g.EventTarget === "undefined") {
+  g.EventTarget = class EventTarget {
+    private _listeners: Record<string, any[]> = {};
+    addEventListener(type: string, cb: any) {
+      if (!cb) return;
+      (this._listeners[type] = this._listeners[type] || []).push(cb);
+    }
+    removeEventListener(type: string, cb: any) {
+      const l = this._listeners[type];
+      if (!l) return;
+      const i = l.indexOf(cb);
+      if (i >= 0) l.splice(i, 1);
+    }
+    dispatchEvent(ev: any) {
+      if (ev && ev.target == null) ev.target = this;
+      if (ev) ev.currentTarget = this;
+      const l = this._listeners[ev?.type];
+      if (l) {
+        l.slice().forEach(cb => {
+          try { typeof cb === "function" ? cb.call(this, ev) : cb?.handleEvent?.(ev); } catch {}
+        });
+      }
+      return !(ev && ev.defaultPrevented);
+    }
+  };
+}
+
 // ─── WebRTC globals ─────────────────────────────────────────────────────────────
 // Sets up RTCPeerConnection, RTCSessionDescription, MediaStream, and
 // navigator.mediaDevices.getUserMedia on the global scope. Trystero can then use

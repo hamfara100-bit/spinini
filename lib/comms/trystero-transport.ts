@@ -25,7 +25,8 @@ import { joinRoom, selfId } from "trystero";
 import { RTCPeerConnection } from "react-native-webrtc";
 
 import type {
-  CommsMediaTransport, CommsMessage, CommsStatus, RemoteStream, LocalStream,
+  CommsMediaTransport, CommsSyncTransport, SyncEnvelope,
+  CommsMessage, CommsStatus, RemoteStream, LocalStream,
 } from "./transport";
 
 /** Namespaces the Trystero swarm so we never collide with other apps' rooms. */
@@ -49,17 +50,19 @@ const RTC_CONFIG = {
 type Room = any;
 type SendFn = (data: any, targets?: string | string[]) => void;
 
-export class TrysteroTransport implements CommsMediaTransport {
+export class TrysteroTransport implements CommsMediaTransport, CommsSyncTransport {
   readonly backend = "trystero";
   readonly selfPeerId = selfId as string;
 
   private state: CommsStatus = "disconnected";
   private room: Room = null;
   private sendMsg: SendFn | null = null;
+  private sendSyncFn: SendFn | null = null;
 
   private msgCbs    = new Set<(m: CommsMessage) => void>();
   private peerCbs   = new Set<(n: number) => void>();
   private streamCbs = new Set<(s: RemoteStream, peerId: string) => void>();
+  private syncCbs   = new Set<(env: SyncEnvelope, peerId: string) => void>();
   private peers     = new Set<string>();
 
   status() { return this.state; }
@@ -89,6 +92,18 @@ export class TrysteroTransport implements CommsMediaTransport {
     // onMessage is a setter; handler is (payload, metadata) with metadata.peerId.
     msgAction.onMessage = (data: any) => {
       this.msgCbs.forEach(cb => cb(data as CommsMessage));
+    };
+
+    // State-sync channel. Relays reducer actions / full snapshots so the family
+    // state converges across devices. Same makeAction object shape as "msg".
+    const syncAction = this.room.makeAction("sync");
+    this.sendSyncFn = (data: any, target?: string | string[]) => {
+      const p = target !== undefined ? syncAction.send(data, { target }) : syncAction.send(data);
+      p?.catch?.(() => {});
+    };
+    syncAction.onMessage = (data: any, meta: any) => {
+      const peerId = meta?.peerId ?? "";
+      this.syncCbs.forEach(cb => cb(data as SyncEnvelope, peerId));
     };
 
     // Presence — onPeerJoin/onPeerLeave are SETTERS in v0.25, not methods.
@@ -122,6 +137,17 @@ export class TrysteroTransport implements CommsMediaTransport {
     return () => this.peerCbs.delete(cb);
   }
 
+  // ─── State sync ─────────────────────────────────────────────────────────────
+  sendSync(env: SyncEnvelope, target?: string | string[]): void {
+    if (this.state !== "connected" || !this.sendSyncFn) return;
+    this.sendSyncFn(env, target);
+  }
+
+  onSync(cb: (env: SyncEnvelope, peerId: string) => void): () => void {
+    this.syncCbs.add(cb);
+    return () => this.syncCbs.delete(cb);
+  }
+
   // ─── Media ────────────────────────────────────────────────────────────────
   addStream(stream: LocalStream, target?: string | string[]): void {
     // v0.25: addStream(stream, { target }) — options object, not positional.
@@ -141,10 +167,12 @@ export class TrysteroTransport implements CommsMediaTransport {
     try { this.room?.leave(); } catch { /* leave() is best-effort */ }
     this.room = null;
     this.sendMsg = null;
+    this.sendSyncFn = null;
     this.peers.clear();
     this.msgCbs.clear();
     this.peerCbs.clear();
     this.streamCbs.clear();
+    this.syncCbs.clear();
     this.state = "disconnected";
   }
 

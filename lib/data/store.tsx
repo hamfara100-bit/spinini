@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { saveVaultPassword, deleteVaultPassword } from "../vault-store";
 import { uid } from "../utils";
 import { saveGoogleTokens, deleteGoogleTokens, saveRecoveryCode } from "../secure-tokens";
+import { useFamilySync } from "./sync-bridge";
 import {
   AppState, AppAction, KidState, KidProfile, KidRules,
   MoneyState, BehaviorScoreState, PermissionLedger, FamilyFilterStatus, CloudBackupConfig,
@@ -2225,12 +2226,56 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
   }, [state, hydrated]);
 
+  // Cross-device state sync (Piece 1). Relays reducer actions over the P2P
+  // transport so the family state converges across the parent + kid devices.
+  // `dispatch` (raw reducer) is passed so REMOTE actions apply without
+  // re-broadcasting. Degrades to a no-op when the P2P swarm is unavailable.
+  const stateRef = React.useRef(state);
+  stateRef.current = state;
+
+  // Per-family P2P sync room. Null until the device is signed into a family;
+  // when null `useFamilySync` joins no swarm at all (no cross-family leak).
+  // Recomputed on Supabase auth changes so signing in / joining a family on the
+  // account screen wires up sync live, without an app restart.
+  const [syncRoomId, setSyncRoomId] = React.useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let authSub: { subscription?: { unsubscribe: () => void } } | null = null;
+    // Load the Supabase-backed account layer lazily so a backend/SDK init
+    // failure can never crash app startup (the whole app mounts DataProvider).
+    (async () => {
+      try {
+        const { getMembership, familyRoomId } = await import("../family-account");
+        const { supabase } = await import("../supabase");
+        const recompute = () => {
+          getMembership()
+            .then(m => { if (!cancelled) setSyncRoomId(m ? familyRoomId(m.familyId) : null); })
+            .catch(() => { if (!cancelled) setSyncRoomId(null); });
+        };
+        recompute();
+        const res = supabase.auth.onAuthStateChange(() => recompute());
+        authSub = res.data;
+      } catch {
+        if (!cancelled) setSyncRoomId(null);
+      }
+    })();
+    return () => { cancelled = true; authSub?.subscription?.unsubscribe(); };
+  }, []);
+
+  const sync = useFamilySync(dispatch, () => stateRef.current, hydrated, syncRoomId);
+  const broadcastRef = React.useRef(sync.broadcast);
+  broadcastRef.current = sync.broadcast;
+
   const batchTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingChoreKidsRef = React.useRef<Set<string>>(new Set());
 
   // Wrap dispatch so sensitive data is mirrored to SecureStore instead of AsyncStorage.
   const secureDispatch = useCallback((action: AppAction) => {
     dispatch(action);
+
+    // Relay this locally-applied action to the other device(s). Secrets are
+    // denylisted inside the bridge; no-op when the P2P swarm isn't connected.
+    broadcastRef.current(action);
 
     // Notification batching: collect chore submissions and fire one grouped notification after 90s
     if (action.type === "CHORE_SUBMIT_PROOF") {

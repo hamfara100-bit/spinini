@@ -33,6 +33,41 @@ export interface CommsMessage {
 
 export type CommsStatus = "disconnected" | "connecting" | "connected";
 
+// ─── Cross-device state sync ────────────────────────────────────────────────────
+// Carries reducer actions (and full-state snapshots for catch-up) between the
+// parent device and the kid device(s) so the shared family state stays in sync.
+// This is what makes Remote Lock, Screen Rules, Chores, Allowance, etc. actually
+// reach the other phone instead of only mutating the local copy.
+export interface SyncEnvelope {
+  /** "action" = one reducer action to replay; "snapshot" = full AppState;
+   *  "request-snapshot" = ask peers to send their current snapshot. */
+  kind: "action" | "snapshot" | "request-snapshot";
+  /** The reducer action (kind="action") or the AppState (kind="snapshot"). */
+  payload?: any;
+  /** Trystero selfPeerId of the sender — used to ignore our own echoes. */
+  origin: string;
+  /** Monotonic per-sender counter (lets receivers drop stale/duplicate frames). */
+  seq: number;
+  /** Globally-unique id for an "action" frame. Shared with the offline-queue row
+   *  so an action delivered BOTH live and via the queue is applied exactly once. */
+  eventId?: string;
+}
+
+/**
+ * Optional sync capability layered on top of the chat transport. A backend that
+ * can relay reducer actions between devices (Trystero/WebRTC) implements this;
+ * the loopback backend does not. The store feature-detects with
+ * `"sendSync" in transport` before wiring the relay.
+ */
+export interface CommsSyncTransport extends CommsTransport {
+  /** The stable peer identity assigned by the backend — used as the frame origin. */
+  readonly selfPeerId: string;
+  /** Broadcast (or target) a sync frame to peers. No-op if disconnected. */
+  sendSync(env: SyncEnvelope, target?: string | string[]): void;
+  /** Subscribe to inbound sync frames. Returns an unsubscribe fn. */
+  onSync(cb: (env: SyncEnvelope, peerId: string) => void): () => void;
+}
+
 export interface CommsTransport {
   /** Stable identifier for the backend implementation (telemetry/debug). */
   readonly backend: string;
