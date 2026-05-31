@@ -1,6 +1,7 @@
-﻿import React, { useState } from "react";
+﻿import React, { useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Linking,
+  Modal, Dimensions, ScrollView,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { checkForUpdates, APP_VERSION } from "../../../../lib/check-update";
@@ -9,12 +10,14 @@ import * as Notifications from "expo-notifications";
 import * as ImagePicker from "expo-image-picker";
 import * as Contacts from "expo-contacts";
 import { AudioModule } from "expo-audio";
-import { useCameraPermissions } from "expo-camera";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import QRCode from "react-native-qrcode-svg";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { hashPin } from "../../../../lib/utils";
 import { PinPad } from "../../../../components/pin-pad";
 import { useData } from "../../../../lib/data/store";
+import { getMembership, redeemPairing } from "../../../../lib/family-account";
 
 type Tab = "help" | "privacy";
 
@@ -80,6 +83,49 @@ export default function HelpScreen() {
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [, requestCamera] = useCameraPermissions();
+
+  // ── Link with parent ─────────────────────────────────────────────────────────
+  const [linkMode, setLinkMode]       = useState<"idle" | "myqr" | "scan">("idle");
+  const [linkBusy, setLinkBusy]       = useState(false);
+  const [linkDone, setLinkDone]       = useState(false);
+  const [scanPerm, requestScanPerm]   = useCameraPermissions();
+  const scannedRef                    = useRef(false);
+  const QR_SIZE = Math.min(Dimensions.get("window").width - 96, 200);
+  const QR_SCHEME = "spinini://join/";
+
+  // QR the kid shows to the parent — encodes their profile so parent can add them quickly.
+  const kid = state.kids.find(k => k.profile.id === id);
+  const kidQrValue = kid
+    ? `spinini://add-kid?name=${encodeURIComponent(kid.profile.name)}&age=${kid.profile.age}&mascot=${kid.profile.mascot}`
+    : null;
+
+  async function openScanForParent() {
+    if (!scanPerm?.granted) {
+      const res = await requestScanPerm();
+      if (!res.granted) { Alert.alert("Camera needed", "Allow camera access to scan the parent's QR code."); return; }
+    }
+    scannedRef.current = false;
+    setLinkMode("scan");
+  }
+
+  async function onParentQrScanned({ data }: { data: string }) {
+    if (scannedRef.current) return;
+    scannedRef.current = true;
+    setLinkMode("idle");
+    const raw = data.startsWith(QR_SCHEME) ? data.slice(QR_SCHEME.length).trim().toUpperCase() : data.trim().toUpperCase();
+    if (raw.length !== 6) { Alert.alert("Invalid QR", "That doesn't look like a Spinini invite code."); return; }
+    if (!kid) { Alert.alert("No profile", "Couldn't find this kid's profile."); return; }
+    setLinkBusy(true);
+    try {
+      await redeemPairing(raw, kid.profile.name, kid.profile.age);
+      setLinkDone(true);
+      Alert.alert("✅ Linked!", `${kid.profile.name} is now connected to the family account. Cross-device sync is active!`);
+    } catch (e) {
+      Alert.alert("Couldn't link", e instanceof Error ? e.message : String(e));
+    } finally {
+      setLinkBusy(false);
+    }
+  }
 
   const hasPin = !!state.parentSettings.pin;
 
@@ -195,6 +241,85 @@ export default function HelpScreen() {
             {checking ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.permBtnText}>🔐 Check App Permissions</Text>}
           </TouchableOpacity>
           <Text style={styles.permHint}>Tap to make sure everything the app needs is turned on.</Text>
+
+          {/* ── Link with parent ── */}
+          <View style={styles.linkCard}>
+            <View style={styles.linkHeader}>
+              <Text style={styles.linkIcon}>🔗</Text>
+              <Text style={styles.linkTitle}>Link with Parent</Text>
+            </View>
+            <Text style={styles.linkSub}>
+              Connect this device to your parent's account so they can monitor and communicate with you across devices.
+            </Text>
+
+            {linkDone ? (
+              <View style={styles.linkDoneRow}>
+                <Text style={styles.linkDoneText}>✅ Linked to family account! Cross-device sync is active.</Text>
+              </View>
+            ) : (
+              <>
+                {/* Option 1: show kid's QR for parent to scan */}
+                <TouchableOpacity
+                  style={[styles.linkBtn, styles.linkBtnPrimary]}
+                  onPress={() => setLinkMode(m => m === "myqr" ? "idle" : "myqr")}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.linkBtnEmoji}>📋</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.linkBtnTitle}>Show MY QR code</Text>
+                    <Text style={styles.linkBtnSub}>Parent scans this to add you to their app</Text>
+                  </View>
+                  <Text style={styles.linkBtnArrow}>{linkMode === "myqr" ? "▲" : "▼"}</Text>
+                </TouchableOpacity>
+
+                {linkMode === "myqr" && kidQrValue && (
+                  <View style={styles.myQrBox}>
+                    <View style={styles.qrWrap}>
+                      <QRCode value={kidQrValue} size={QR_SIZE} color={Colors.primary} backgroundColor="#fff" />
+                    </View>
+                    <Text style={styles.myQrName}>{kid?.profile.name}</Text>
+                    <Text style={styles.myQrHint}>Show this to your parent. They scan it on their phone to add you.</Text>
+                  </View>
+                )}
+
+                {/* Option 2: scan parent's QR to join family sync */}
+                <TouchableOpacity
+                  style={[styles.linkBtn, styles.linkBtnSecondary]}
+                  onPress={openScanForParent}
+                  disabled={linkBusy}
+                  activeOpacity={0.85}
+                >
+                  {linkBusy
+                    ? <ActivityIndicator color={Colors.primary} style={{ marginRight: 8 }} />
+                    : <Text style={styles.linkBtnEmoji}>📷</Text>}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.linkBtnTitle, { color: Colors.primary }]}>Scan parent's QR code</Text>
+                    <Text style={styles.linkBtnSub}>Parent shows you a QR — scan it to join their family account</Text>
+                  </View>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          {/* Scanner modal — scan the QR the parent generated */}
+          <Modal visible={linkMode === "scan"} animationType="slide" onRequestClose={() => setLinkMode("idle")}>
+            <View style={styles.scanModal}>
+              <Text style={styles.scanTitle}>Scan Parent's QR Code</Text>
+              <CameraView
+                style={styles.scanCamera}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                onBarcodeScanned={onParentQrScanned}
+              />
+              <View style={styles.scanOverlay}>
+                <View style={styles.scanFrame} />
+              </View>
+              <Text style={styles.scanHint}>Point at the QR code on your parent's phone</Text>
+              <TouchableOpacity style={[styles.linkBtn, styles.linkBtnPrimary, { margin: Spacing.lg }]} onPress={() => setLinkMode("idle")}>
+                <Text style={[styles.linkBtnTitle, { color: "#fff" }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Modal>
 
           {FAQS.map((faq, i) => (
             <View key={i} style={styles.card}>
@@ -317,6 +442,33 @@ const styles = StyleSheet.create({
   backupBtn:           { backgroundColor: Colors.primary, borderRadius: Radius.lg, padding: 12, alignItems: "center" },
   backupBtnText:       { color: "#fff", fontWeight: "700", fontSize: FontSize.base },
   backupPrompt:        { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 20 },
+
+  // Link with parent section
+  linkCard:        { backgroundColor: Colors.surfaceLight, borderRadius: Radius.xl, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1.5, borderColor: Colors.primary + "33", gap: 10, ...Shadow.sm },
+  linkHeader:      { flexDirection: "row", alignItems: "center", gap: 10 },
+  linkIcon:        { fontSize: 26 },
+  linkTitle:       { fontSize: FontSize.md, fontWeight: "800", color: Colors.primary },
+  linkSub:         { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 19 },
+  linkDoneRow:     { backgroundColor: Colors.success + "18", borderRadius: Radius.lg, padding: 12 },
+  linkDoneText:    { color: Colors.success, fontWeight: "700", fontSize: FontSize.sm, textAlign: "center" },
+  linkBtn:         { flexDirection: "row", alignItems: "center", borderRadius: Radius.lg, padding: 14, gap: 10 },
+  linkBtnPrimary:  { backgroundColor: Colors.primary },
+  linkBtnSecondary:{ backgroundColor: Colors.primary + "10", borderWidth: 1.5, borderColor: Colors.primary + "44" },
+  linkBtnEmoji:    { fontSize: 22 },
+  linkBtnTitle:    { fontSize: FontSize.base, fontWeight: "800", color: "#fff" },
+  linkBtnSub:      { fontSize: FontSize.xs, color: "rgba(255,255,255,0.75)", marginTop: 2 },
+  linkBtnArrow:    { fontSize: 16, color: "rgba(255,255,255,0.7)", fontWeight: "700" },
+  myQrBox:         { alignItems: "center", gap: 10, backgroundColor: Colors.cardLight, borderRadius: Radius.lg, padding: Spacing.md },
+  qrWrap:          { padding: 10, backgroundColor: "#fff", borderRadius: Radius.lg, ...Shadow.sm },
+  myQrName:        { fontSize: FontSize.md, fontWeight: "900", color: Colors.primary },
+  myQrHint:        { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: "center", lineHeight: 17 },
+  // Scanner modal
+  scanModal:       { flex: 1, backgroundColor: "#000" },
+  scanTitle:       { color: "#fff", fontWeight: "800", fontSize: FontSize.md, textAlign: "center", paddingTop: 56, paddingBottom: 16 },
+  scanCamera:      { flex: 1 },
+  scanOverlay:     { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", pointerEvents: "none" },
+  scanFrame:       { width: 200, height: 200, borderRadius: 14, borderWidth: 3, borderColor: Colors.primary, shadowColor: Colors.primary, shadowOpacity: 0.8, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } },
+  scanHint:        { color: "#ccc", textAlign: "center", fontSize: FontSize.sm, padding: Spacing.md },
 
   // Privacy tab — kid
   privHero:            { alignItems: "center", paddingVertical: Spacing.md, marginBottom: Spacing.sm },
