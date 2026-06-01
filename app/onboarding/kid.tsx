@@ -91,10 +91,10 @@ export default function KidOnboarding() {
     if (scannedRef.current) return;
     scannedRef.current = true;
     setShowScanner(false);
-    const code = data.startsWith(QR_SCHEME)
-      ? data.slice(QR_SCHEME.length).trim().toUpperCase()
-      : data.trim().toUpperCase();
-    setJoinCode(code);
+    // QR encodes the plain 6-char code. Strip any accidental scheme prefix
+    // (e.g. from the old account.tsx flow) just in case.
+    const raw = data.startsWith("spinini://join/") ? data.slice(15) : data;
+    setJoinCode(raw.trim().toUpperCase().slice(0, 6));
   }
 
   async function handleJoin() {

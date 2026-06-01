@@ -14,9 +14,6 @@ import {
 
 const QR_SIZE = Math.min(Dimensions.get("window").width - 96, 220);
 
-/** The deep-link scheme embedded in the QR — scanning extracts the 6-char code. */
-const QR_SCHEME = "spinini://join/";
-
 type Screen = "loading" | "auth" | "setup" | "createFamily" | "joinFamily" | "family";
 
 export default function AccountScreen() {
@@ -126,9 +123,8 @@ export default function AccountScreen() {
     scannedRef.current = true;
     setShowScanner(false);
     // Extract the 6-char code whether it's a raw code or a spinini://join/<CODE> URI.
-    const code = data.startsWith(QR_SCHEME)
-      ? data.slice(QR_SCHEME.length).trim().toUpperCase()
-      : data.trim().toUpperCase();
+    const raw = data.startsWith("spinini://join/") ? data.slice(15) : data;
+    const code = raw.trim().toUpperCase().slice(0, 6);
     setJoinCode(code);
   }
 
@@ -250,10 +246,9 @@ export default function AccountScreen() {
               <Text style={styles.sectionLabel}>Add a child's device</Text>
               {pairingCode ? (
                 <View style={styles.qrBox}>
-                  {/* QR code — encodes spinini://join/<CODE> */}
                   <View style={styles.qrWrap}>
                     <QRCode
-                      value={QR_SCHEME + pairingCode}
+                      value={pairingCode}
                       size={QR_SIZE}
                       color={Colors.primary}
                       backgroundColor="#fff"

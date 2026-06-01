@@ -14,6 +14,7 @@ import {
   ActivityIndicator, Dimensions, ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
+import * as Notifications from "expo-notifications";
 import QRCode from "react-native-qrcode-svg";
 import { useData } from "../../lib/data/store";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../lib/theme";
@@ -23,7 +24,8 @@ import {
 } from "../../lib/family-account";
 
 const QR_SIZE = Math.min(Dimensions.get("window").width - 96, 220);
-const QR_SCHEME = "spinini://join/";
+// QR encodes the plain 6-char code — no custom URL scheme — so a regular
+// camera app shows the code as copyable text rather than "no app found".
 
 type Step = "auth" | "createFamily" | "qr";
 
@@ -120,6 +122,10 @@ export default function ParentOnboarding() {
     setBusy(true); setError("");
     try {
       await createFamily(familyName.trim() || `${displayName.trim()}'s Family`, displayName.trim());
+      // Request notification permission now — it's the only permission we ask
+      // for during onboarding. Everything else (location, camera, etc.) is
+      // requested on demand when the parent actually uses those features.
+      await Notifications.requestPermissionsAsync().catch(() => {});
       const code = await createPairing("kid", 30);
       setPairingCode(code);
       setStep("qr");
@@ -210,7 +216,10 @@ export default function ParentOnboarding() {
         {pairingCode ? (
           <>
             <View style={s.qrWrap}>
-              <QRCode value={QR_SCHEME + pairingCode} size={QR_SIZE} color={Colors.primary} backgroundColor="#fff" />
+              {/* Encode just the 6-char code as plain text — no URL scheme,
+                  so scanning with a regular camera shows the code as text
+                  rather than triggering "no app found for spinini://" */}
+              <QRCode value={pairingCode} size={QR_SIZE} color={Colors.primary} backgroundColor="#fff" />
             </View>
             <Text style={s.qrCode}>{pairingCode}</Text>
             <Text style={s.qrHint}>Or they can type the code above manually. Expires in 30 min.</Text>

@@ -94,10 +94,11 @@ export default function SettingsScreen() {
       const keys = await AsyncStorage.getAllKeys();
       await AsyncStorage.multiRemove(keys as string[]);
     } catch (_) { /* best-effort */ }
-    // Reset in-memory state and navigate to welcome
+    // Reset in-memory state — go to role chooser so the device can be
+    // re-assigned as parent or child after a full reset.
     dispatch({ type: "RESET_APP" });
     setShowDeleteModal(false);
-    router.replace("/setup/welcome");
+    router.replace("/onboarding");
   }
 
   return (

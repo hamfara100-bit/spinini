@@ -22,24 +22,23 @@ export interface Membership {
   age: number | null;
 }
 
-/** Map a plain username to the synthetic email Supabase Auth stores it under. */
-function usernameToEmail(username: string): string {
-  return `${username.trim().toLowerCase()}@famkids.app`;
+/**
+ * Resolve an identifier to an email for Supabase Auth.
+ * • Real email (contains @) → used as-is.
+ * • Plain username          → mapped to username@famkids.app (legacy accounts).
+ */
+function toEmail(emailOrUsername: string): string {
+  const v = emailOrUsername.trim().toLowerCase();
+  return v.includes("@") ? v : `${v}@famkids.app`;
 }
 
-export async function signUp(username: string, password: string): Promise<void> {
-  const { error } = await supabase.auth.signUp({
-    email: usernameToEmail(username),
-    password,
-  });
+export async function signUp(emailOrUsername: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signUp({ email: toEmail(emailOrUsername), password });
   if (error) throw new Error(error.message);
 }
 
-export async function signIn(username: string, password: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithPassword({
-    email: usernameToEmail(username),
-    password,
-  });
+export async function signIn(emailOrUsername: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithPassword({ email: toEmail(emailOrUsername), password });
   if (error) throw new Error(error.message);
 }
 
