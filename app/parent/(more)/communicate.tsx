@@ -111,63 +111,6 @@ function ChatTab() {
   const isCoParentDM = coParents.some(cp => cp.id === filter);
   const selectedCoParent = coParents.find(cp => cp.id === filter);
 
-  // ── Start a live call (video or voice-only) ───────────────────────────────
-  // Uses the same Jitsi room mechanism the incoming-call screen already uses
-  // (meet.jit.si is serverless for us — no backend), so it works over the
-  // internet for anyone who joins the same room. We also notify the selected
-  // kid(s) and drop a tappable join link into the chat thread so the other
-  // side can join from their device.
-  function startCall(video: boolean) {
-    const slug = filter === "all" ? "family" : filter;
-    const room = `spinini-${slug}`.replace(/[^a-zA-Z0-9_-]/g, "");
-    const base = `https://meet.jit.si/${room}`;
-    const url = video ? base : `${base}#config.startWithVideoMuted=true`;
-    const kind = video ? "📹 Video call" : "📞 Voice call";
-
-    // Ring the recipient kid(s) with an in-app notification + push.
-    const targetKids = filter === "all"
-      ? state.kids
-      : state.kids.filter(k => k.profile.id === filter);
-    targetKids.forEach(kid => {
-      dispatch({
-        type: "NOTIFICATION_ADD",
-        kidId: kid.profile.id,
-        notification: {
-          id: uid(), kidId: kid.profile.id, kind: "ping",
-          title: `${kind} from Parent`,
-          body: "Open Call & Chat and tap the call link to join!",
-          read: false, createdAt: nowIso(),
-        },
-      });
-    });
-    Notifications.scheduleNotificationAsync({
-      content: { title: `${kind} started`, body: "Tap to join the call.", sound: true },
-      trigger: null,
-    }).catch(() => {});
-
-    // Drop a join link into the thread so co-parents / kids can tap to join.
-    const id = uid();
-    seenIds.current.add(id);
-    dispatch({
-      type: "FAMILY_CHAT_PUSH",
-      message: {
-        id, text: `${kind} started — tap to join: ${url}`,
-        authorId: AUTHOR_ID, authorName: AUTHOR_NAME,
-        recipients: filter === "all" ? [] : [filter],
-        sentAt: nowIso(), readBy: [AUTHOR_ID],
-      },
-    });
-    transportRef.current?.send({
-      id, text: `${kind} started — tap to join: ${url}`,
-      authorId: AUTHOR_ID, authorName: AUTHOR_NAME, sentAt: nowIso(),
-      recipients: filter === "all" ? [] : [filter],
-    });
-
-    // Open the call on this device.
-    Linking.openURL(url).catch(() =>
-      Alert.alert("Couldn't start the call", "Unable to open the call screen on this device."));
-  }
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -204,17 +147,6 @@ function ChatTab() {
           </TouchableOpacity>
         ))}
       </ScrollView>
-
-      {/* Live call actions — start a video or voice call with the selected
-          recipient (opens a Jitsi room; the kid is pinged + sent a join link). */}
-      <View style={s.callActionRow}>
-        <TouchableOpacity style={[s.callActionBtn, s.callVideoBtn]} onPress={() => startCall(true)}>
-          <Text style={s.callActionText}>📹  Video call</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.callActionBtn, s.callVoiceBtn]} onPress={() => startCall(false)}>
-          <Text style={s.callActionText}>📞  Voice call</Text>
-        </TouchableOpacity>
-      </View>
 
       {isCoParentDM && (
         <View style={s.coParentDMBanner}>
@@ -329,6 +261,42 @@ function IncomingCallsTab() {
   const { state, dispatch } = useData();
   const [callbackFor, setCallbackFor] = useState<IncomingCall | null>(null);
 
+  // Start a new outgoing call (video or voice) from the Calls tab.
+  // Posts a tappable join link to the family chat and pings all kids.
+  function startCall(video: boolean) {
+    const room = "spinini-family";
+    const base = `https://meet.jit.si/${room}`;
+    const url = video ? base : `${base}#config.startWithVideoMuted=true`;
+    const kind = video ? "📹 Video call" : "📞 Voice call";
+
+    state.kids.forEach(kid => {
+      dispatch({
+        type: "NOTIFICATION_ADD",
+        kidId: kid.profile.id,
+        notification: {
+          id: uid(), kidId: kid.profile.id, kind: "ping",
+          title: `${kind} from Parent`,
+          body: "Open Call & Chat and tap the call link to join!",
+          read: false, createdAt: nowIso(),
+        },
+      });
+    });
+    Notifications.scheduleNotificationAsync({
+      content: { title: `${kind} started`, body: "Tap to join the call.", sound: true },
+      trigger: null,
+    }).catch(() => {});
+    dispatch({
+      type: "FAMILY_CHAT_PUSH",
+      message: {
+        id: uid(), text: `${kind} started — tap to join: ${url}`,
+        authorId: AUTHOR_ID, authorName: AUTHOR_NAME,
+        recipients: [], sentAt: nowIso(), readBy: [AUTHOR_ID],
+      },
+    });
+    Linking.openURL(url).catch(() =>
+      Alert.alert("Couldn't start the call", "Unable to open the call screen on this device."));
+  }
+
   const calls = (state.incomingCalls ?? []);
   const ringing = calls.filter(c => c.status === "ringing");
   const recent  = calls.filter(c => c.status !== "ringing").slice(0, 20);
@@ -370,6 +338,17 @@ function IncomingCallsTab() {
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: Spacing.md }}>
+
+      {/* ── Start a call ── */}
+      <View style={s.callActionRow}>
+        <TouchableOpacity style={[s.callActionBtn, s.callVideoBtn]} onPress={() => startCall(true)}>
+          <Text style={s.callActionText}>📹  Video call</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.callActionBtn, s.callVoiceBtn]} onPress={() => startCall(false)}>
+          <Text style={s.callActionText}>📞  Voice call</Text>
+        </TouchableOpacity>
+      </View>
+
       {ringing.length === 0 && recent.length === 0 && (
         <View style={s.emptySection}>
           <Text style={{ fontSize: 56, textAlign: "center" }}>📭</Text>
