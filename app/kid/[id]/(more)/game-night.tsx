@@ -12,7 +12,19 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Animated, Easing,
+  Dimensions,
 } from "react-native";
+
+// ─── Responsive board sizing — fill the available width ──────────────────────
+// Available inner width = screen − ScreenContainer padding (16×2) − board card
+// padding (10×2) = screen − 52. Capped at 560 so it scales up nicely on tablets
+// without becoming absurd on very wide screens.
+const SCREEN_W = Dimensions.get("window").width;
+const BOARD    = Math.min(SCREEN_W - 52, 560);          // board edge length
+const TTT_CELL = Math.floor(BOARD / 3);                 // tic-tac-toe 3×3
+const C4_CELL  = Math.floor((BOARD - 12) / 7);          // connect-4 7 cols (pad 6 each side)
+const MEM_CELL = Math.floor((BOARD - 30) / 4);          // memory 4 per row (3 gaps)
+const GRID8    = Math.floor(BOARD / 8);                  // checkers / chess 8×8
 import { useLocalSearchParams } from "expo-router";
 import { useData, useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
@@ -1097,7 +1109,7 @@ const ms = StyleSheet.create({
   lineBar: { backgroundColor: Colors.primary + "12", borderRadius: 12, padding: 10, marginBottom: 12 },
   lineText: { fontSize: 13, fontWeight: "800", color: Colors.primary },
   lineNext: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  board: { backgroundColor: Colors.surfaceLight, borderRadius: 20, padding: 16, position: "relative", overflow: "hidden", ...Shadow.sm },
+  board: { backgroundColor: Colors.surfaceLight, borderRadius: 20, padding: 10, position: "relative", overflow: "hidden", alignItems: "center", ...Shadow.sm },
   handoff: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: Colors.surfaceLight, alignItems: "center", justifyContent: "center", padding: 24, gap: 6 },
   handoffEmoji: { fontSize: 48 },
   handoffTitle: { fontSize: 16, fontWeight: "800", color: Colors.textSecondary },
@@ -1123,19 +1135,19 @@ const gs = StyleSheet.create({
   turnText: { fontSize: 15, fontWeight: "800" },
 
   // Tic-Tac-Toe
-  tttGrid: { width: 270, height: 270, flexDirection: "row", flexWrap: "wrap", gap: 0 },
-  tttCell: { width: 90, height: 90, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: Colors.border },
+  tttGrid: { width: TTT_CELL * 3, height: TTT_CELL * 3, flexDirection: "row", flexWrap: "wrap", gap: 0 },
+  tttCell: { width: TTT_CELL, height: TTT_CELL, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: Colors.border },
   tttCellWin: { backgroundColor: Colors.success + "33" },
-  tttMark: { fontSize: 52, fontWeight: "900" },
+  tttMark: { fontSize: Math.round(TTT_CELL * 0.6), fontWeight: "900" },
 
   // Connect 4
   c4DropRow: { flexDirection: "row", marginBottom: 4 },
-  c4DropBtn: { width: 40, height: 28, alignItems: "center", justifyContent: "center" },
-  c4DropArrow: { fontSize: 20, fontWeight: "900" },
-  c4Board: { backgroundColor: "#2563EB", borderRadius: 12, padding: 5 },
+  c4DropBtn: { width: C4_CELL, height: 30, alignItems: "center", justifyContent: "center" },
+  c4DropArrow: { fontSize: Math.round(C4_CELL * 0.5), fontWeight: "900" },
+  c4Board: { backgroundColor: "#2563EB", borderRadius: 14, padding: 6 },
   c4Row: { flexDirection: "row" },
-  c4Cell: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  c4Disc: { width: 32, height: 32, borderRadius: 16 },
+  c4Cell: { width: C4_CELL, height: C4_CELL, alignItems: "center", justifyContent: "center" },
+  c4Disc: { width: Math.round(C4_CELL * 0.82), height: Math.round(C4_CELL * 0.82), borderRadius: Math.round(C4_CELL * 0.41) },
   c4Empty: { backgroundColor: "#EFF6FF" },
   c4DiscWin: { borderWidth: 3, borderColor: Colors.success },
 
@@ -1153,33 +1165,33 @@ const gs = StyleSheet.create({
   // Memory
   memScore: { flexDirection: "row", justifyContent: "space-around", width: "100%", marginBottom: 14 },
   memScoreText: { fontSize: 14, fontWeight: "800" },
-  memGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, maxWidth: 280 },
-  memCard: { width: 60, height: 60, borderRadius: 12, backgroundColor: Colors.primary + "15", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: Colors.primary + "30" },
+  memGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, maxWidth: BOARD },
+  memCard: { width: MEM_CELL, height: MEM_CELL, borderRadius: 14, backgroundColor: Colors.primary + "15", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: Colors.primary + "30" },
   memCardMatched: { backgroundColor: Colors.success + "22", borderColor: Colors.success },
-  memEmoji: { fontSize: 30 },
+  memEmoji: { fontSize: Math.round(MEM_CELL * 0.5) },
 
   // Checkers
   ckBoard: { borderWidth: 3, borderColor: "#5C4329", borderRadius: 6, overflow: "hidden" },
   ckRow: { flexDirection: "row" },
-  ckCell: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
+  ckCell: { width: GRID8, height: GRID8, alignItems: "center", justifyContent: "center" },
   ckCellSel: { backgroundColor: Colors.warning },
-  ckDot: { position: "absolute", width: 14, height: 14, borderRadius: 7, backgroundColor: Colors.success + "CC" },
-  ckPiece: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.5)" },
+  ckDot: { position: "absolute", width: Math.round(GRID8 * 0.36), height: Math.round(GRID8 * 0.36), borderRadius: Math.round(GRID8 * 0.18), backgroundColor: Colors.success + "CC" },
+  ckPiece: { width: Math.round(GRID8 * 0.72), height: Math.round(GRID8 * 0.72), borderRadius: Math.round(GRID8 * 0.36), alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.5)" },
   ckPieceMovable: { borderColor: Colors.success, borderWidth: 2.5 },
-  ckKing: { fontSize: 15, color: "#FCD34D" },
+  ckKing: { fontSize: Math.round(GRID8 * 0.38), color: "#FCD34D" },
   ckHint: { fontSize: 12, color: Colors.textSecondary, marginTop: 12, fontWeight: "600" },
 
   // Chess
   chessCheck: { fontSize: 14, fontWeight: "900", color: Colors.error, marginBottom: 6 },
   chBoard: { borderWidth: 3, borderColor: "#4B5320", borderRadius: 4, overflow: "hidden" },
   chRow: { flexDirection: "row" },
-  chCell: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  chCell: { width: GRID8, height: GRID8, alignItems: "center", justifyContent: "center" },
   chCellSel: { backgroundColor: "#BACA2B" },
   chCellCheck: { backgroundColor: Colors.error + "99" },
-  chGlyph: { fontSize: 30, lineHeight: 36 },
+  chGlyph: { fontSize: Math.round(GRID8 * 0.74), lineHeight: Math.round(GRID8 * 0.9) },
   chGlyphWhite: { textShadowColor: "#000", textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 1.5 },
-  chDot: { position: "absolute", width: 14, height: 14, borderRadius: 7, backgroundColor: "rgba(0,0,0,0.35)" },
-  chCapture: { position: "absolute", width: 38, height: 38, borderRadius: 19, borderWidth: 4, borderColor: "rgba(0,0,0,0.35)" },
+  chDot: { position: "absolute", width: Math.round(GRID8 * 0.36), height: Math.round(GRID8 * 0.36), borderRadius: Math.round(GRID8 * 0.18), backgroundColor: "rgba(0,0,0,0.35)" },
+  chCapture: { position: "absolute", width: GRID8 - 2, height: GRID8 - 2, borderRadius: (GRID8 - 2) / 2, borderWidth: 4, borderColor: "rgba(0,0,0,0.35)" },
 
 });
 
