@@ -1110,7 +1110,7 @@ const modal = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "#00000066", justifyContent: "flex-end" },
   card: {
     backgroundColor: Colors.surfaceLight, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingBottom: 32, maxHeight: "78%", flex: 0,
+    paddingBottom: 32, height: "78%",
   },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",

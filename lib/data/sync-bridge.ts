@@ -54,7 +54,8 @@ export const SYNC_ENABLED = true;
 const SYNC_DENYLIST = new Set<string>([
   "@@HYDRATE",
   "SET_PIN_RECOVERY_CODE",
-  "VAULT_ADD", "VAULT_REMOVE",  // password manager — parent-device-only
+  "VAULT_ADD", "VAULT_REMOVE",       // password manager — parent-device-only
+  "FAMILY_CHAT_MARK_READ",           // chat read-state is per-device, not synced
 ]);
 
 export function isSyncable(action: { type: string }): boolean {

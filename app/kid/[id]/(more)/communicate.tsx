@@ -380,6 +380,12 @@ function KidChatTab({ kidId }: { kidId: string }) {
   const transportRef = useRef<CommsTransport | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
 
+  // Mark chat read for this kid whenever the screen is open / new messages land
+  // — clears the Call & Chat tab badge.
+  useEffect(() => {
+    dispatch({ type: "FAMILY_CHAT_MARK_READ", viewerId: kidId });
+  }, [(state.familyMessages ?? []).length]);
+
   useEffect(() => {
     (state.familyMessages ?? []).forEach(m => seenIds.current.add(m.id));
     const t = createCommsTransport("trystero");

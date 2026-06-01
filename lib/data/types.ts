@@ -2227,6 +2227,7 @@ export type AppAction =
   | { type: "CHORE_APPLY_PENALTY"; choreId: string; kidId: string; date: string; penaltyPoints: number }
   // Family
   | { type: "FAMILY_CHAT_PUSH"; message: FamilyMessage }
+  | { type: "FAMILY_CHAT_MARK_READ"; viewerId: string }
   | { type: "ALBUM_ADD"; item: AlbumItem }
   | { type: "ALBUM_ADD_KID"; kidId: string; item: AlbumItem }
   | { type: "MEMORY_ADD"; memory: Memory }

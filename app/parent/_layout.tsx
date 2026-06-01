@@ -38,6 +38,11 @@ export default function ParentLayout() {
     return sum + chores + rewards;
   }, 0);
 
+  // Unread family chat messages (not from this parent, not yet read here).
+  const unreadChat = (state.familyMessages ?? []).filter(
+    m => m.authorId !== "__parent__" && !m.readBy.includes("__parent__")
+  ).length;
+
   async function checkPin(pin: string) {
     const hashed = await hashPin(pin);
     if (hashed === state.parentSettings.pin) {
@@ -75,7 +80,7 @@ export default function ParentLayout() {
           }}
         />
         <Tabs.Screen name="family" options={{ title: "Family",   tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👨‍👩‍👧</Text> }} />
-        <Tabs.Screen name="callchat" options={{ title: "Call & Chat", tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💬</Text> }} />
+        <Tabs.Screen name="callchat" options={{ title: "Call & Chat", tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💬</Text>, tabBarBadge: unreadChat > 0 ? unreadChat : undefined }} />
         <Tabs.Screen name="notes"  options={{ title: "Notes",    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📝</Text> }} />
         <Tabs.Screen name="(more)/ping" options={{ title: "Ping Kid",  tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📣</Text> }} />
         <Tabs.Screen name="(more)/reports" options={{ title: "Reports",  tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📈</Text> }} />

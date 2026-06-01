@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useData } from "../lib/data/store";
 import { Colors, FontSize, Radius, Spacing } from "../lib/theme";
-import { forceMaxVolume as nativeForceMaxVolume, getDefaultAlarmUri } from "expo-loud-alarm";
+import { forceMaxVolume as nativeForceMaxVolume, getDefaultAlarmUri, playSystemAlarm, stopSystemAlarm } from "expo-loud-alarm";
 
 const PATTERN_HIGH: number[] = [0, 800, 100, 800, 100, 800, 100, 800];
 
@@ -30,8 +30,15 @@ try {
 } catch {}
 
 async function startAlarmSound(): Promise<() => void> {
-  const systemAlarmUri = Platform.OS === "android" ? getDefaultAlarmUri() : null;
-  const audioUri = systemAlarmUri ?? "https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3";
+  // Android: play the system alarm ringtone natively — reliable on the alarm
+  // stream (the expo-audio URI path often loads but stays silent).
+  if (Platform.OS === "android") {
+    try {
+      playSystemAlarm();
+      return () => { try { stopSystemAlarm(); } catch {} };
+    } catch {}
+  }
+  const audioUri = "https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3";
 
   if (createAudioPlayer && AudioModule) {
     try {

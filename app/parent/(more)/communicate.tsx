@@ -64,6 +64,12 @@ function ChatTab() {
   const transportRef = useRef<CommsTransport | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
 
+  // Mark all chat read for the parent whenever this screen is mounted or new
+  // messages arrive while it's open — clears the Call & Chat tab badge.
+  useEffect(() => {
+    dispatch({ type: "FAMILY_CHAT_MARK_READ", viewerId: AUTHOR_ID });
+  }, [state.familyMessages.length]);
+
   useEffect(() => {
     // Seed dedup set with messages already in the store.
     state.familyMessages.forEach(m => seenIds.current.add(m.id));

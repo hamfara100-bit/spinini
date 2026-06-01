@@ -17,7 +17,7 @@ import {
 import { useData } from "../lib/data/store";
 import type { KidNotification } from "../lib/data/types";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../lib/theme";
-import { forceMaxVolume as nativeForceMaxVolume, getDefaultAlarmUri } from "expo-loud-alarm";
+import { forceMaxVolume as nativeForceMaxVolume, getDefaultAlarmUri, playSystemAlarm, stopSystemAlarm } from "expo-loud-alarm";
 
 // Vibration patterns (ms): [wait, vibrate, pause, ...]
 const PATTERN_NORMAL: number[] = [0, 400, 200, 400, 200, 400];
@@ -50,9 +50,19 @@ try {
 async function startAlarmSound(level: "normal" | "high"): Promise<() => void> {
   const vol = level === "high" ? 1.0 : 0.65;
 
-  // Prefer device's built-in alarm sound URI on Android (guaranteed to play on STREAM_ALARM)
-  const systemAlarmUri = Platform.OS === "android" ? getDefaultAlarmUri() : null;
-  const audioUri = systemAlarmUri ?? "https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3";
+  // Attempt 0 (Android): play the system alarm ringtone NATIVELY on the alarm
+  // stream. This is the most reliable — it doesn't depend on expo-audio being
+  // able to decode a content:// ringtone URI (which often loads but stays
+  // silent, leaving only vibration).
+  if (Platform.OS === "android") {
+    try {
+      playSystemAlarm();
+      return () => { try { stopSystemAlarm(); } catch {} };
+    } catch {}
+  }
+
+  // Fallback: a real audio file via expo-audio / expo-av.
+  const audioUri = "https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3";
 
   // Attempt 1: expo-audio createAudioPlayer
   if (createAudioPlayer && AudioModule) {

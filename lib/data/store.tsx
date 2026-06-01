@@ -773,6 +773,12 @@ function reducer(state: AppState, action: AppAction): AppState {
 
     case "FAMILY_CHAT_PUSH":
       return { ...state, familyMessages: [...state.familyMessages, action.message] };
+    case "FAMILY_CHAT_MARK_READ":
+      return {
+        ...state,
+        familyMessages: state.familyMessages.map(m =>
+          m.readBy.includes(action.viewerId) ? m : { ...m, readBy: [...m.readBy, action.viewerId] }),
+      };
     case "ALBUM_ADD":
       return { ...state, sharedAlbum: [action.item, ...state.sharedAlbum] };
     case "ALBUM_ADD_KID":

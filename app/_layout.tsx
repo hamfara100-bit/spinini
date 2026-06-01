@@ -4,7 +4,7 @@ import "../lib/comms/trystero-polyfills";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View, Linking, AppState as RNAppState, Platform } from "react-native";
+import { View, Linking, AppState as RNAppState, Platform, Vibration } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as NavigationBar from "expo-navigation-bar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -77,6 +77,51 @@ function AppOpenAdBridge() {
   const pathname = usePathname();
   const isKidRoute = pathname.startsWith("/kid/");
   useAppOpenAd(!isKidRoute);
+  return null;
+}
+
+/**
+ * Fires a notification + beep + vibration whenever a new family chat message
+ * arrives from someone else AND you're not currently looking at the chat. Runs
+ * for both parent and kid (myId derived from the route).
+ */
+function ChatNotifier() {
+  const { state } = useData();
+  const pathname = usePathname();
+  const seen = useRef<Set<string>>(new Set());
+  const seeded = useRef(false);
+
+  // Who am I on this device? Parent uses a fixed id; kid uses their profile id.
+  const myId = pathname.startsWith("/parent")
+    ? "__parent__"
+    : (pathname.match(/^\/kid\/([^/]+)/)?.[1] ?? null);
+  // Already looking at a chat/call screen? Then don't interrupt.
+  const onChatRef = useRef(false);
+  onChatRef.current = /callchat|communicate|\/chat/.test(pathname);
+  const myIdRef = useRef(myId);
+  myIdRef.current = myId;
+
+  useEffect(() => {
+    // First pass: seed the "already seen" set with existing messages so we don't
+    // notify for history on launch.
+    if (!seeded.current) {
+      state.familyMessages.forEach(m => seen.current.add(m.id));
+      seeded.current = true;
+      return;
+    }
+    for (const m of state.familyMessages) {
+      if (seen.current.has(m.id)) continue;
+      seen.current.add(m.id);
+      if (myIdRef.current && m.authorId === myIdRef.current) continue; // my own message
+      if (onChatRef.current) continue;                                  // already viewing chat
+      Vibration.vibrate([0, 350, 180, 350]);
+      Notifications.scheduleNotificationAsync({
+        content: { title: `💬 ${m.authorName}`, body: m.text || "New message", sound: true },
+        trigger: null,
+      }).catch(() => {});
+    }
+  }, [state.familyMessages]);
+
   return null;
 }
 
@@ -253,6 +298,7 @@ export default function RootLayout() {
                 <BackgroundBridge />
                 <AppOpenAdBridge />
                 <SchedulerBridge />
+                <ChatNotifier />
                 <DeepLinkHandler />
                 <ScreenTimeLimitNotifier />
                 <OfflineBanner />

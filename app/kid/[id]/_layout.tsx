@@ -6,6 +6,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Colors } from "../../../lib/theme";
 import { AlarmOverlay } from "../../../components/alarm-overlay";
 import { LockdownOverlay } from "../../../components/lockdown-overlay";
+import { useData } from "../../../lib/data/store";
 
 // Tab definitions — must match the Tabs.Screen names below
 const TAB_DEFS = [
@@ -23,6 +24,11 @@ function KidTabBar({ state, navigation }: BottomTabBarProps) {
   // Get the kid id so we can build full paths like /kid/kid1/home
   // This ensures [id] is preserved when switching tabs from any (more) sub-screen
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { state: appState } = useData();
+  // Unread family chat messages for this kid (not theirs, not yet read here).
+  const unreadChat = (appState.familyMessages ?? []).filter(
+    m => m.authorId !== id && !m.readBy.includes(id)
+  ).length;
 
   return (
     <View style={[tabStyles.bar, { paddingBottom: pb, height: 56 + pb }]}>
@@ -52,7 +58,14 @@ function KidTabBar({ state, navigation }: BottomTabBarProps) {
             accessibilityRole="button"
             accessibilityState={focused ? { selected: true } : {}}
           >
-            <Text style={{ fontSize: 20, lineHeight: 24, textAlign: "center" }}>{def.emoji}</Text>
+            <View>
+              <Text style={{ fontSize: 20, lineHeight: 24, textAlign: "center" }}>{def.emoji}</Text>
+              {def.name === "callchat" && unreadChat > 0 && (
+                <View style={tabStyles.badge}>
+                  <Text style={tabStyles.badgeText}>{unreadChat > 9 ? "9+" : unreadChat}</Text>
+                </View>
+              )}
+            </View>
             <Text style={[tabStyles.label, { color }]}>{def.label}</Text>
             {focused && <View style={[tabStyles.dot, { backgroundColor: Colors.primary }]} />}
           </TouchableOpacity>
@@ -91,6 +104,13 @@ const tabStyles = StyleSheet.create({
     borderRadius: 2,
     marginTop: 2,
   },
+  badge: {
+    position: "absolute", top: -6, right: -12,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: Colors.error, alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 4, borderWidth: 1.5, borderColor: Colors.surfaceLight,
+  },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 });
 
 export default function KidLayout() {
