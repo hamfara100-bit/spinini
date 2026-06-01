@@ -1788,6 +1788,7 @@ export interface KidState {
   // Install monitoring — snapshot of packages seen on the device + new-install alerts
   knownPackages: string[];          // every package ever seen on the device (baseline)
   installAlerts: InstallAlert[];    // apps detected since last seen, awaiting parent review
+  deviceApps?: { packageName: string; appName: string }[];  // ALL apps on the kid's device (reported by the kid, shown in parent App Rules)
 }
 
 export interface EmergencyContact {

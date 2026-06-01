@@ -398,9 +398,11 @@ function reducer(state: AppState, action: AppAction): AppState {
       return updateKid(state, action.kidId, k => {
         const known = k.knownPackages ?? [];
         const allPkgs = action.apps.map(a => a.packageName);
+        // Always store the full app list so the parent App Rules screen can show
+        // the apps that are actually on the KID's device.
         // First sync (no baseline yet): record everything, don't flag existing apps.
         if (known.length === 0) {
-          return { ...k, knownPackages: allPkgs };
+          return { ...k, knownPackages: allPkgs, deviceApps: action.apps };
         }
         const knownSet = new Set(known);
         const existingAlerts = new Set((k.installAlerts ?? []).map(a => a.packageName));
@@ -408,11 +410,13 @@ function reducer(state: AppState, action: AppAction): AppState {
         const newAlerts = action.apps
           .filter(a => !knownSet.has(a.packageName) && !existingAlerts.has(a.packageName))
           .map(a => ({ packageName: a.packageName, appName: a.appName, detectedAt: now }));
-        if (newAlerts.length === 0) return k;
         return {
           ...k,
+          deviceApps: action.apps,
           knownPackages: Array.from(new Set([...known, ...allPkgs])),
-          installAlerts: [...newAlerts, ...(k.installAlerts ?? [])].slice(0, 50),
+          installAlerts: newAlerts.length === 0
+            ? (k.installAlerts ?? [])
+            : [...newAlerts, ...(k.installAlerts ?? [])].slice(0, 50),
         };
       });
     case "DISMISS_INSTALL_ALERT":

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Alert, Switch, Modal, TextInput, ActivityIndicator,
@@ -8,7 +8,6 @@ import { ScreenContainer } from "../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
 import type { AppRule, AppSchedule, AppRuleMode } from "../../../lib/data/types";
 import { computeScheduledMode, isScheduleActive, nextWindowLabel } from "../../../lib/app-scheduler";
-import { UsageStats } from "../../../modules/expo-usage-stats/src";
 
 // ─── Letter-avatar helper ────────────────────────────────────────────────────
 
@@ -87,34 +86,17 @@ export default function RemoteAppsScreen() {
   const [kidId, setKidId] = useState(state.kids[0]?.profile.id ?? "");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingRule, setEditingRule] = useState<AppRule | null>(null);
-  const [deviceApps, setDeviceApps] = useState<DeviceApp[]>([]);
-  const [loading, setLoading] = useState(true);
   const [addSearch, setAddSearch] = useState("");
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const apps = await UsageStats.getInstalledApps();
-        setDeviceApps(apps);
-      } catch {
-        setDeviceApps([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  // Diff device apps against the stored snapshot → flag newly-installed apps.
-  useEffect(() => {
-    if (deviceApps.length > 0 && kidId) {
-      dispatch({ type: "SYNC_INSTALLED_APPS", kidId, apps: deviceApps });
-    }
-  }, [deviceApps, kidId]);
 
   const kid = state.kids.find(k => k.profile.id === kidId);
   const managedIds: string[] = kid?.rules.installedApps ?? [];
   const installAlerts = kid?.installAlerts ?? [];
+
+  // The apps installed on the KID's device — reported by the kid device via
+  // SYNC_INSTALLED_APPS and synced here. (Previously this listed the PARENT's
+  // own apps, which was wrong.)
+  const deviceApps: DeviceApp[] = kid?.deviceApps ?? [];
+  const loading = false;
 
   // Map packageName → appName for quick lookup
   const deviceMap = Object.fromEntries(deviceApps.map(a => [a.packageName, a.appName]));
@@ -233,7 +215,7 @@ export default function RemoteAppsScreen() {
               {deviceApps.length === 0 && (
                 <View style={styles.permHint}>
                   <Text style={styles.permHintText}>
-                    ⚠️ No apps found — make sure Usage Stats permission is granted in Settings.
+                    ⏳ Waiting for {kid?.profile.name ?? "your kid"}'s device to report its installed apps. Make sure their device is online and the app has been opened recently.
                   </Text>
                 </View>
               )}
@@ -322,17 +304,11 @@ export default function RemoteAppsScreen() {
                 <View style={{ alignItems: "center", paddingTop: 40, gap: 12 }}>
                   <Text style={{ fontSize: 40 }}>⚠️</Text>
                   <Text style={{ color: Colors.textPrimary, fontWeight: "700", fontSize: FontSize.base, textAlign: "center" }}>
-                    No apps found on device
+                    No apps reported yet
                   </Text>
                   <Text style={{ color: Colors.textSecondary, fontSize: FontSize.sm, textAlign: "center", lineHeight: 20 }}>
-                    Grant Usage Stats permission in Android Settings to see installed apps.
+                    {kid?.profile.name ?? "Your kid"}'s device hasn't reported its installed apps yet. Make sure their device is online and the Spinini app has been opened recently.
                   </Text>
-                  <TouchableOpacity
-                    style={{ backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 24, paddingVertical: 12 }}
-                    onPress={() => UsageStats.openUsageSettings()}
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "700" }}>Open Settings →</Text>
-                  </TouchableOpacity>
                 </View>
               ) : filteredUnmanaged.length === 0 ? (
                 <View style={{ alignItems: "center", paddingTop: 40, gap: 10 }}>

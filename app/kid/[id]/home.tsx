@@ -450,6 +450,28 @@ export default function KidHome() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
+  // ── Report THIS device's installed apps to the parent ───────────────────────
+  // The kid device enumerates its own apps and syncs them up so the parent's App
+  // Manager can allow/limit them. (Previously the parent listed its OWN apps,
+  // which was the wrong device.)
+  useEffect(() => {
+    if (!kid) return;
+    let cancelled = false;
+    async function reportApps() {
+      try {
+        const mod = require("../../../modules/expo-usage-stats/src");
+        const UsageStats = mod.UsageStats ?? mod.default?.UsageStats;
+        if (!UsageStats?.getInstalledApps) return;
+        const apps = await UsageStats.getInstalledApps();
+        if (cancelled || !Array.isArray(apps) || apps.length === 0) return;
+        dispatch({ type: "SYNC_INSTALLED_APPS", kidId: id, apps });
+      } catch {}
+    }
+    reportApps();
+    const interval = setInterval(reportApps, 10 * 60_000); // refresh every 10 min
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
   // ── #7 Smart bedtime dimming — starts 15 min before bedtime ─────────────────
   useEffect(() => {
     if (!kid || kid.rules.freeMode) return;
