@@ -839,10 +839,19 @@ export interface AgentMessage {
   timestamp: string;
 }
 
+export interface AdviceCategory {
+  id: string;
+  name: string;
+  emoji?: string;
+  createdAt: string;
+}
+
 export interface LifeAdvice {
   id: string;
-  text: string;
+  title?: string;          // short headline shown in the list
+  text: string;            // the full advice body, revealed when tapped
   emoji?: string;
+  categoryId?: string;     // which AdviceCategory this belongs to
   photoUri?: string;
   targetKids: string[];
   readBy: string[];
@@ -1969,6 +1978,7 @@ export interface AppState {
   storyMedia: StoryMedia[];
   voiceSamples: VoiceSample[];
   advice: LifeAdvice[];
+  adviceCategories: AdviceCategory[];
   agentMessages: AgentMessage[];
   activeVideoRoom?: VideoRoom;
   permissions: PermissionLedger;
@@ -2316,6 +2326,8 @@ export type AppAction =
   | { type: "ADVICE_ADD"; advice: LifeAdvice }
   | { type: "ADVICE_READ"; adviceId: string; kidId: string }
   | { type: "ADVICE_REMOVE"; adviceId: string }
+  | { type: "ADVICE_CATEGORY_ADD"; category: AdviceCategory }
+  | { type: "ADVICE_CATEGORY_REMOVE"; categoryId: string }
   // Permissions & Cloud
   | { type: "PERMISSION_SET"; payload: Partial<PermissionStatus> }
   | { type: "PERMISSION_ONBOARDING_DONE" }

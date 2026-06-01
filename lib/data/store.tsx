@@ -277,6 +277,7 @@ export const initialState: AppState = {
   storyMedia: [],
   voiceSamples: [],
   advice: [],
+  adviceCategories: [],
   agentMessages: [],
   aiResults: [],
   permissions: defaultPermissions,
@@ -1098,6 +1099,15 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, advice: [action.advice, ...state.advice] };
     case "ADVICE_REMOVE":
       return { ...state, advice: state.advice.filter(a => a.id !== action.adviceId) };
+    case "ADVICE_CATEGORY_ADD":
+      return { ...state, adviceCategories: [action.category, ...(state.adviceCategories ?? [])] };
+    case "ADVICE_CATEGORY_REMOVE":
+      // Remove the category and any advice that belonged to it.
+      return {
+        ...state,
+        adviceCategories: (state.adviceCategories ?? []).filter(c => c.id !== action.categoryId),
+        advice: state.advice.filter(a => a.categoryId !== action.categoryId),
+      };
     case "ADVICE_READ":
       return {
         ...state,

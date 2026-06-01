@@ -29,7 +29,8 @@ export default function AdviceScreen() {
           >
             <Text style={{ fontSize: 32 }}>{a.emoji ?? "💎"}</Text>
             <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-              <Text style={styles.cardText}>{a.text}</Text>
+              {!!a.title && <Text style={styles.cardTitle}>{a.title}</Text>}
+              {!!a.text && <Text style={styles.cardText}>{a.text}</Text>}
               {!a.readBy.includes(id) && <View style={styles.newBadge}><Text style={styles.newBadgeText}>NEW</Text></View>}
             </View>
           </TouchableOpacity>
@@ -46,6 +47,7 @@ const styles = StyleSheet.create({
   emptyText: { color: Colors.textSecondary, textAlign: "center" },
   card: { flexDirection: "row", alignItems: "flex-start", backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: 8, ...Shadow.sm },
   cardUnread: { borderLeftWidth: 4, borderLeftColor: Colors.primary },
+  cardTitle: { fontSize: FontSize.md, fontWeight: "800", color: Colors.textPrimary, marginBottom: 2 },
   cardText: { fontSize: FontSize.base, color: Colors.textPrimary, lineHeight: 22, flex: 1 },
   newBadge: { backgroundColor: Colors.primary, borderRadius: Radius.full, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 2, marginTop: 4 },
   newBadgeText: { color: "#fff", fontSize: FontSize.xs, fontWeight: "700" },
