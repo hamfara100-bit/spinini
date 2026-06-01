@@ -2006,6 +2006,10 @@ export interface AppState {
   familyMusic: FamilyMusicTrack[];
   familyBooks: FamilyBook[];
   version: number;
+  /** Whether this physical device is set up as a "parent" or "kid" device.
+   *  Set once on first launch and never changed — the device is locked into
+   *  one role. Null means the role chooser hasn't been shown yet. */
+  deviceRole: "parent" | "kid" | null;
 }
 
 // ─── Feature 15: Family Tech Agreement ───────────────────────────────────────
@@ -2116,6 +2120,7 @@ export interface FamilyBook {
 export type AppAction =
   // Setup
   | { type: "SETUP_COMPLETE" }
+  | { type: "SET_DEVICE_ROLE"; role: "parent" | "kid" }
   | { type: "SET_PARENT_SETTINGS"; payload: Partial<ParentSettings> }
   | { type: "SET_PARENT_PROFILE"; payload: Partial<ParentProfile> }
   | { type: "SET_PARENT_MEMBERSHIP"; payload: ParentMembership }

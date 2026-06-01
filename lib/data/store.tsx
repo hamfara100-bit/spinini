@@ -295,6 +295,7 @@ export const initialState: AppState = {
     alertParent: true,
   },
   setupDone: false,
+  deviceRole: null,
   incomingCalls: [],
   parentNotes: [],
   parentTodos: [],
@@ -325,6 +326,8 @@ function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "SETUP_COMPLETE":
       return { ...state, setupDone: true };
+    case "SET_DEVICE_ROLE":
+      return { ...state, deviceRole: action.role };
     case "SET_PARENT_SETTINGS":
       return { ...state, parentSettings: { ...state.parentSettings, ...action.payload } };
     case "SET_PARENT_APPLE":
