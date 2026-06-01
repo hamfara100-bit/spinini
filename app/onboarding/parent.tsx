@@ -41,23 +41,36 @@ function syncKidsFromSupabase(
 ) {
   // Dedup by Supabase userId (the shared key) — if we already have a profile
   // with that ID, skip it. This prevents duplicates on repeated calls.
+  const kidMembers = members.filter(m => m.role === "kid");
+  const memberIds = new Set(kidMembers.map(m => m.userId));
   const existingIds = new Set(existingKids.map(k => k.profile.id));
-  members
-    .filter(m => m.role === "kid")
-    .forEach((m, i) => {
-      if (existingIds.has(m.userId)) return;
-      dispatch({
-        type: "ADD_KID",
-        payload: {
-          id: m.userId,   // ← Supabase userId = shared ID both devices agree on
-          name: m.displayName,
-          age: m.age ?? 10,
-          mascot: MASCOTS[i % MASCOTS.length],
-          color: COLORS[i % COLORS.length],
-          createdAt: nowIso(),
-        },
-      });
+  const usedPlaceholders = new Set<string>();
+  kidMembers.forEach((m, i) => {
+    if (existingIds.has(m.userId)) return;
+    // Rekey a locally-added placeholder (random id, name match) to the real
+    // userId instead of adding a second card for the same child.
+    const placeholder = existingKids.find(k =>
+      !memberIds.has(k.profile.id) &&
+      !usedPlaceholders.has(k.profile.id) &&
+      k.profile.name.trim().toLowerCase() === m.displayName.trim().toLowerCase()
+    );
+    if (placeholder) {
+      usedPlaceholders.add(placeholder.profile.id);
+      dispatch({ type: "RELINK_KID_ID", oldId: placeholder.profile.id, newId: m.userId });
+      return;
+    }
+    dispatch({
+      type: "ADD_KID",
+      payload: {
+        id: m.userId,   // ← Supabase userId = shared ID both devices agree on
+        name: m.displayName,
+        age: m.age ?? 10,
+        mascot: MASCOTS[i % MASCOTS.length],
+        color: COLORS[i % COLORS.length],
+        createdAt: nowIso(),
+      },
     });
+  });
 }
 
 const QR_SIZE = Math.min(Dimensions.get("window").width - 96, 220);

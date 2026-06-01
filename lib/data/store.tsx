@@ -344,7 +344,31 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, parentMembership: action.payload };
 
     case "ADD_KID":
+      // Idempotent by profile id: multiple sync paths (app-start sync, onboarding
+      // poll, P2P echo) can dispatch ADD_KID for the same child with the same
+      // Supabase userId. Each caller dedups against a possibly-stale state.kids
+      // snapshot, so guard here too — never add the same kid twice.
+      if (state.kids.some(k => k.profile.id === action.payload.id)) return state;
       return { ...state, kids: [...state.kids, newKidState(action.payload)] };
+    case "RELINK_KID_ID": {
+      // A locally-added placeholder kid (random id) is being matched to its real
+      // Supabase userId once the child links. Rekey the placeholder so targeted
+      // actions reach the right device — or, if the canonical kid already exists,
+      // drop the placeholder to avoid a duplicate.
+      if (action.oldId === action.newId) return state;
+      const hasCanonical = state.kids.some(k => k.profile.id === action.newId);
+      if (hasCanonical) {
+        return { ...state, kids: state.kids.filter(k => k.profile.id !== action.oldId) };
+      }
+      return {
+        ...state,
+        kids: state.kids.map(k =>
+          k.profile.id === action.oldId
+            ? { ...k, profile: { ...k.profile, id: action.newId } }
+            : k
+        ),
+      };
+    }
     case "UPDATE_KID":
       return updateKid(state, action.kidId, k => ({ ...k, profile: { ...k.profile, ...action.payload } }));
     case "REMOVE_KID":

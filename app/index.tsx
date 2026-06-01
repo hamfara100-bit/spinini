@@ -28,23 +28,38 @@ function syncKidsFromSupabase(
   existingKids: { profile: { id: string; name: string } }[],
   dispatch: (a: AppAction) => void,
 ) {
+  const kidMembers = members.filter(m => m.role === "kid");
+  const memberIds = new Set(kidMembers.map(m => m.userId));
   const existingIds = new Set(existingKids.map(k => k.profile.id));
-  members
-    .filter(m => m.role === "kid")
-    .forEach((m, i) => {
-      if (existingIds.has(m.userId)) return;
-      dispatch({
-        type: "ADD_KID",
-        payload: {
-          id: m.userId,
-          name: m.displayName,
-          age: m.age ?? 10,
-          mascot: MASCOTS[i % MASCOTS.length],
-          color: COLORS[i % COLORS.length],
-          createdAt: nowIso(),
-        },
-      });
+  const usedPlaceholders = new Set<string>();
+  kidMembers.forEach((m, i) => {
+    // Already have the canonical (userId-keyed) kid → nothing to do.
+    if (existingIds.has(m.userId)) return;
+    // A kid added locally on the parent device (random placeholder id) before
+    // the child linked: match it by name and rekey it to the real userId so we
+    // don't end up with two cards for the same child.
+    const placeholder = existingKids.find(k =>
+      !memberIds.has(k.profile.id) &&
+      !usedPlaceholders.has(k.profile.id) &&
+      k.profile.name.trim().toLowerCase() === m.displayName.trim().toLowerCase()
+    );
+    if (placeholder) {
+      usedPlaceholders.add(placeholder.profile.id);
+      dispatch({ type: "RELINK_KID_ID", oldId: placeholder.profile.id, newId: m.userId });
+      return;
+    }
+    dispatch({
+      type: "ADD_KID",
+      payload: {
+        id: m.userId,
+        name: m.displayName,
+        age: m.age ?? 10,
+        mascot: MASCOTS[i % MASCOTS.length],
+        color: COLORS[i % COLORS.length],
+        createdAt: nowIso(),
+      },
     });
+  });
 }
 
 export default function SmartRouter() {

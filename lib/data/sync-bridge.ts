@@ -58,6 +58,7 @@ const SYNC_DENYLIST = new Set<string>([
   "FAMILY_CHAT_MARK_READ",           // chat read-state is per-device, not synced
   "VOICE_RECORDING_ADD",             // local audio file URIs — only valid on the kid's own device
   "VOICE_RECORDING_DELETE",
+  "RELINK_KID_ID",                   // parent-local placeholder→userId reconciliation
 ]);
 
 export function isSyncable(action: { type: string }): boolean {

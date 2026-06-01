@@ -2131,6 +2131,7 @@ export type AppAction =
   | { type: "SET_LAST_BACKUP"; timestamp: string }
   // Kids
   | { type: "ADD_KID"; payload: KidProfile }
+  | { type: "RELINK_KID_ID"; oldId: string; newId: string }
   | { type: "UPDATE_KID"; kidId: string; payload: Partial<KidProfile> }
   | { type: "REMOVE_KID"; kidId: string }
   // Rules
