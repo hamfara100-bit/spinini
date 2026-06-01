@@ -372,8 +372,8 @@ export default function ParentDashboard() {
       : `/parent/(more)/${feature.id}`;
     const badge = feature.id === "remote-apps" ? installAlertCount : undefined;
 
-    // Game Night lives under /kid/[id]/(more)/game-night — route to first kid
-    // or show a kid picker if there are multiple kids.
+    // Game Night renders via the parent-side wrapper so the parent stays in
+    // parent mode (the screen itself lives under the kid layout).
     function handlePress() {
       if (feature.id === "game-night") {
         if (state.kids.length === 0) {
@@ -381,7 +381,7 @@ export default function ParentDashboard() {
           return;
         }
         if (state.kids.length === 1) {
-          router.push(`/kid/${state.kids[0].profile.id}/(more)/game-night` as any);
+          router.push(`/parent/(more)/game-night?kidId=${state.kids[0].profile.id}` as any);
           return;
         }
         // Multiple kids: navigate to Family tab which has the picker

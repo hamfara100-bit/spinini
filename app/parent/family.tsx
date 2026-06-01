@@ -18,7 +18,7 @@ export default function FamilyScreen() {
       return;
     }
     if (state.kids.length === 1) {
-      router.push(`/kid/${state.kids[0].profile.id}/(more)/game-night` as any);
+      router.push(`/parent/(more)/game-night?kidId=${state.kids[0].profile.id}` as any);
       return;
     }
     setShowGamePicker(true);
@@ -65,7 +65,7 @@ export default function FamilyScreen() {
                 <TouchableOpacity
                   key={kid.profile.id}
                   style={styles.pickerRow}
-                  onPress={() => { setShowGamePicker(false); router.push(`/kid/${kid.profile.id}/(more)/game-night` as any); }}
+                  onPress={() => { setShowGamePicker(false); router.push(`/parent/(more)/game-night?kidId=${kid.profile.id}` as any); }}
                   activeOpacity={0.85}
                 >
                   <Mascot type={kid.profile.mascot} size={40} animate={false} />

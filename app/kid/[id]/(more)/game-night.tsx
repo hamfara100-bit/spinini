@@ -847,8 +847,12 @@ function MatchView({
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN SCREEN — lobby
 // ════════════════════════════════════════════════════════════════════════════
-export default function GameNightScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+export default function GameNightScreen({ id: idProp }: { id?: string } = {}) {
+  // Reusable from a parent route (which passes `id` as a prop so it can render
+  // inside the PARENT layout instead of the kid tab layout — otherwise launching
+  // Game Night from parent mode drops the parent into kid mode).
+  const params = useLocalSearchParams<{ id: string }>();
+  const id = idProp ?? params.id;
   const kid = useKid(id);
   const { state, dispatch } = useData();
 
