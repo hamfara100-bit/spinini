@@ -148,7 +148,6 @@ const PARENT_FEATURES: FeatureDef[] = [
   // Safety & Control (most important — shown first)
   { id: "find-phone",       emoji: "📱", label: "Find a Phone",     ...C.safety,  pulse: true },
   { id: "remote-lock",     emoji: "🔒", label: "Remote Lock",      ...C.safety,  pulse: true },
-  { id: "remote-control",  emoji: "📲", label: "Remote Control",   ...C.safety,  pulse: true },
   { id: "device-guardian", emoji: "🛡️", label: "OS Guardian",      ...C.safety              },
   { id: "call-guard",      emoji: "🔇", label: "Call & Text Guard", ...C.safety, pulse: true },
   { id: "bedtime",         emoji: "🌙", label: "Bedtime Mode",      ...C.rules,  pulse: true },
@@ -226,7 +225,7 @@ const PARENT_FEATURES: FeatureDef[] = [
 ];
 
 const SECTIONS = [
-  { label: "🔒 Safety & Rules",   ids: ["find-phone","remote-lock","remote-control","device-guardian","call-guard","bedtime","rules","remote-apps","web-allowlist","morning-routine","teen-mode","stranger-alert","context-screen-time"] },
+  { label: "🔒 Safety & Rules",   ids: ["find-phone","remote-lock","device-guardian","call-guard","bedtime","rules","remote-apps","web-allowlist","morning-routine","teen-mode","stranger-alert","context-screen-time"] },
   { label: "📊 Monitoring",       ids: ["reports","location","watch","ping","notifications","mood-graph","behavior-insights","leaderboard","social-monitor","weekly-report","mood-insight"] },
   { label: "📚 School & Content", ids: ["fitness","chores","school-mgmt","learning-apps","wishes","reward-shop","achievements","important-info","medications","quiz","allowance","kid-requests","family-movies","family-music","family-books"] },
   { label: "💬 Family & Growth",  ids: ["communicate","funny-sounds","memories","stories","advice","apology","wellbeing","family-vote","social","family-calendar","co-parenting","family-tree","digital-agreement","game-night"] },
