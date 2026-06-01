@@ -274,7 +274,10 @@ export function useFamilySync(
       const self = selfIdRef.current;
       // No family or a denylisted secret → don't relay. (No longer requires the
       // P2P transport to be up — the durable queue works regardless.)
-      if (!fid || !self || !isSyncable(action)) return;
+      if (!fid || !self || !isSyncable(action)) {
+        if (isSyncable(action)) console.log("[SYNC] broadcast skipped (no family room yet):", action.type);
+        return;
+      }
 
       const eventId = uid();
       // DURABLE: persist for the other device(s) — this is the primary path now.

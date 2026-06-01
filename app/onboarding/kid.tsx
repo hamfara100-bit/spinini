@@ -23,7 +23,7 @@ import { useData } from "../../lib/data/store";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../lib/theme";
 import { uid, nowIso } from "../../lib/utils";
 import {
-  signUp, signIn, signOut, getMembership, redeemPairing,
+  signUp, signIn, signOut, getMembership, listMembers, redeemPairing,
 } from "../../lib/family-account";
 
 /**
@@ -156,6 +156,16 @@ export default function KidOnboarding() {
           createdAt: nowIso(),
         },
       });
+
+      // Pull the parent's display name from Supabase so the kid's screens show
+      // the real name (e.g. "Mum") instead of the default "Parent".
+      try {
+        const members = await listMembers();
+        const parent = members.find(m => m.role === "parent");
+        if (parent?.displayName) {
+          dispatch({ type: "SET_PARENT_SETTINGS", payload: { name: parent.displayName } });
+        }
+      } catch {}
 
       // Ask for all the permissions the kid device needs (notifications,
       // location, camera, mic, photos, contacts) before entering the home.

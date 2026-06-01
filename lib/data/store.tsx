@@ -2248,8 +2248,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const { supabase } = await import("../supabase");
         const recompute = () => {
           getMembership()
-            .then(m => { if (!cancelled) setSyncRoomId(m ? familyRoomId(m.familyId) : null); })
-            .catch(() => { if (!cancelled) setSyncRoomId(null); });
+            .then(m => {
+              const room = m ? familyRoomId(m.familyId) : null;
+              console.log("[SYNC] membership:", m ? `${m.role} fam ${m.familyId.slice(0,8)}` : "NONE", "→ room", room);
+              if (!cancelled) setSyncRoomId(room);
+            })
+            .catch(e => { console.warn("[SYNC] getMembership failed:", String(e)); if (!cancelled) setSyncRoomId(null); });
         };
         recompute();
         const res = supabase.auth.onAuthStateChange(() => recompute());

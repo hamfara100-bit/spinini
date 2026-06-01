@@ -174,6 +174,9 @@ export default function ParentOnboarding() {
     setBusy(true); setError("");
     try {
       await createFamily(familyName.trim() || `${displayName.trim()}'s Family`, displayName.trim());
+      // Save the parent's name locally + broadcast it so the kid device shows
+      // the real name instead of "Parent" / "Mom & Dad".
+      dispatch({ type: "SET_PARENT_SETTINGS", payload: { name: displayName.trim() } });
       // Request notification permission now — it's the only permission we ask
       // for during onboarding. Everything else (location, camera, etc.) is
       // requested on demand when the parent actually uses those features.

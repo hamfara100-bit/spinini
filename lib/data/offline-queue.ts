@@ -50,14 +50,16 @@ export async function enqueueEvent(
   try {
     const { supabase } = await import("../supabase");
     // author defaults to auth.uid() in the DB; created_at defaults to now().
-    await supabase.from("sync_events").insert({
+    const { error } = await supabase.from("sync_events").insert({
       id,
       family_id: familyId,
       payload: action,
       origin_peer: originPeer,
     });
-  } catch {
-    /* best-effort durability — never throw into the reducer path */
+    if (error) console.warn("[SYNC] enqueue failed:", error.message, "| action:", action?.type);
+    else console.log("[SYNC] enqueued", action?.type, "fam", familyId.slice(0, 8));
+  } catch (e) {
+    console.warn("[SYNC] enqueue threw:", String(e));
   }
 }
 
@@ -81,9 +83,12 @@ export async function fetchEvents(
       .limit(limit);
     if (since) q = q.gte("created_at", since);
     const { data, error } = await q;
-    if (error || !data) return [];
+    if (error) { console.warn("[SYNC] fetch failed:", error.message); return []; }
+    if (!data) return [];
+    if (data.length > 0) console.log("[SYNC] fetched", data.length, "events for fam", familyId.slice(0, 8));
     return data as QueuedEvent[];
-  } catch {
+  } catch (e) {
+    console.warn("[SYNC] fetch threw:", String(e));
     return [];
   }
 }
