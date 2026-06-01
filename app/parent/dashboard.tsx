@@ -184,6 +184,7 @@ const PARENT_FEATURES: FeatureDef[] = [
   { id: "wellbeing",      emoji: "💙", label: "Well-Being",      ...C.family              },
   { id: "family-vote",    emoji: "🎬", label: "Family Vote",     ...C.family, pulse: true },
   { id: "social",         emoji: "📱", label: "Family Social",   ...C.family, pulse: true },
+  { id: "game-night",     emoji: "🎮", label: "Game Night",       ...C.family, pulse: true },
 
   // Growth & Learning
   { id: "quiz",           emoji: "📝", label: "Send Quiz",       ...C.safety, pulse: true },
@@ -228,7 +229,7 @@ const SECTIONS = [
   { label: "🔒 Safety & Rules",   ids: ["find-phone","remote-lock","remote-control","device-guardian","call-guard","bedtime","rules","remote-apps","web-allowlist","morning-routine","teen-mode","stranger-alert","context-screen-time"] },
   { label: "📊 Monitoring",       ids: ["reports","location","watch","ping","notifications","mood-graph","behavior-insights","leaderboard","social-monitor","weekly-report","mood-insight"] },
   { label: "📚 School & Content", ids: ["fitness","chores","school-mgmt","learning-apps","wishes","reward-shop","achievements","important-info","medications","quiz","allowance","kid-requests","family-movies","family-music","family-books"] },
-  { label: "💬 Family & Growth",  ids: ["communicate","funny-sounds","memories","stories","advice","apology","wellbeing","family-vote","social","family-calendar","co-parenting","family-tree","digital-agreement"] },
+  { label: "💬 Family & Growth",  ids: ["communicate","funny-sounds","memories","stories","advice","apology","wellbeing","family-vote","social","family-calendar","co-parenting","family-tree","digital-agreement","game-night"] },
   { label: "✨ AI & Voice",       ids: ["agent","voice-commands","ai-results"] },
   { label: "⚙️ Settings & Admin", ids: ["permissions","account","settings","help","digest","quick-setup","widgets"] },
 ];
@@ -372,6 +373,26 @@ export default function ParentDashboard() {
       ? "/parent/(more)/dns-filter"
       : `/parent/(more)/${feature.id}`;
     const badge = feature.id === "remote-apps" ? installAlertCount : undefined;
+
+    // Game Night lives under /kid/[id]/(more)/game-night — route to first kid
+    // or show a kid picker if there are multiple kids.
+    function handlePress() {
+      if (feature.id === "game-night") {
+        if (state.kids.length === 0) {
+          Alert.alert("No kids yet", "Add a child first to start Game Night!");
+          return;
+        }
+        if (state.kids.length === 1) {
+          router.push(`/kid/${state.kids[0].profile.id}/(more)/game-night` as any);
+          return;
+        }
+        // Multiple kids: navigate to Family tab which has the picker
+        router.push("/parent/family" as any);
+        return;
+      }
+      router.push(route as any);
+    }
+
     return (
       <AnimatedFeatureCard
         key={feature.id}
@@ -379,7 +400,7 @@ export default function ParentDashboard() {
         index={idx}
         width={CARD_W}
         badge={badge}
-        onPress={() => router.push(route as any)}
+        onPress={handlePress}
       />
     );
   };
