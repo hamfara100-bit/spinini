@@ -893,9 +893,15 @@ export default function GameNightScreen() {
   }
 
   function callPlayers() {
-    const others = selectedIds.filter(sid => sid !== id && roster.find(p => p.id === sid && !p.isParent));
+    // Ring every selected KID's device — except the kid who is using THIS device
+    // (only relevant on a kid device). On a parent device no kid is "local", so
+    // the selected kid(s) should all be called. Previously this always excluded
+    // `id`, which on the parent device is the very kid they picked → "nobody to
+    // call".
+    const localKidId = state.deviceRole === "kid" ? id : null;
+    const others = selectedIds.filter(sid => sid !== localKidId && roster.find(p => p.id === sid && !p.isParent));
     if (others.length === 0) {
-      Alert.alert("Nobody to call", "Pick another kid to send a Game Night alarm to their device.");
+      Alert.alert("Nobody to call", "Pick a kid (on their own device) to send a Game Night alarm to.");
       return;
     }
     const inviter = kid?.profile.name ?? "Someone";
