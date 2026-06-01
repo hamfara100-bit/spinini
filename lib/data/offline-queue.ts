@@ -56,10 +56,9 @@ export async function enqueueEvent(
       payload: action,
       origin_peer: originPeer,
     });
-    if (error) console.warn("[SYNC] enqueue failed:", error.message, "| action:", action?.type);
-    else console.log("[SYNC] enqueued", action?.type, "fam", familyId.slice(0, 8));
-  } catch (e) {
-    console.warn("[SYNC] enqueue threw:", String(e));
+    if (error) console.warn("[sync] enqueue failed:", error.message);
+  } catch {
+    /* best-effort durability — never throw into the reducer path */
   }
 }
 
@@ -83,12 +82,9 @@ export async function fetchEvents(
       .limit(limit);
     if (since) q = q.gte("created_at", since);
     const { data, error } = await q;
-    if (error) { console.warn("[SYNC] fetch failed:", error.message); return []; }
-    if (!data) return [];
-    if (data.length > 0) console.log("[SYNC] fetched", data.length, "events for fam", familyId.slice(0, 8));
-    return data as QueuedEvent[];
-  } catch (e) {
-    console.warn("[SYNC] fetch threw:", String(e));
+    if (error) { console.warn("[sync] fetch failed:", error.message); return []; }
+    return (data ?? []) as QueuedEvent[];
+  } catch {
     return [];
   }
 }
