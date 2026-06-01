@@ -27,13 +27,13 @@ export default function PingScreen() {
 
   function requestAmbientListen(kidId: string) {
     Alert.alert(
-      "🎙️ Listen to Surroundings",
-      "This will silently record 30 seconds of audio from your child's device the next time they open the app. The recording will be available here.",
+      "🎙️ Voice Check-in",
+      "When your child next opens the app, they will see a banner and receive a notification letting them know you requested a 30-second voice check-in. The recording will be available here.",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Request Recording", onPress: () => {
+        { text: "Request Check-in", onPress: () => {
           dispatch({ type: "AMBIENT_LISTEN_REQUEST", kidId, request: { requestedAt: nowIso(), durationSecs: 30, fulfilled: false } });
-          Alert.alert("✅ Requested", "The recording will be available once your child opens the app.");
+          Alert.alert("✅ Requested", "Your child will be notified when they open the app.");
         }},
       ]
     );
@@ -60,7 +60,7 @@ export default function PingScreen() {
       {/* ── 🎙️ Listen to Surroundings ── */}
       <View style={ls.section}>
         <Text style={ls.sectionTitle}>🎙️ Listen to Surroundings</Text>
-        <Text style={ls.sectionSub}>Request a silent 30-second ambient recording from your child's device.</Text>
+        <Text style={ls.sectionSub}>Request a 30-second voice check-in. Your child will be notified with a banner and notification before recording starts.</Text>
         {state.kids.map(k => {
           const recordings = (k.ambientRecordings ?? []).slice(0, 5);
           const pendingReq = k.ambientListenRequest && !k.ambientListenRequest.fulfilled;

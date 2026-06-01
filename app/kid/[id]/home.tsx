@@ -1,15 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Modal, Animated, Alert, Dimensions, ScrollView, Platform } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Modal, Animated, Alert, ScrollView, Platform, useWindowDimensions } from "react-native";
 import * as MediaLibrary from "expo-media-library";
 import { captureRef } from "react-native-view-shot";
 import { aggregateWebUsage, aggregateAppUsage, aggregateFeatureTaps, daysAgoDate } from "../../../lib/usage-tracker";
 
-const { width: SCREEN_W } = Dimensions.get("window");
-const GRID_H_PAD = 16;  // matches ScreenContainer paddingHorizontal
+const GRID_H_PAD = 16;
 const GRID_GAP   = 10;
-// Card width for 3-per-row with space-evenly: ~29% of available width, capped so
-// tiles don't balloon on a tablet (space-evenly just flows more per row instead).
-const CARD_W     = Math.min(120, Math.floor((SCREEN_W - GRID_H_PAD * 2) * 0.29));
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Speech from "expo-speech";
 import * as Location from "expo-location";
@@ -380,6 +376,10 @@ export default function KidHome() {
   const { dispatch } = useData();
   const router = useRouter();
   const theme = useColors();
+  const { width: screenW } = useWindowDimensions();
+  const isTablet = screenW >= 600;
+  // Tablets get up to 144px cards (more readable); phones cap at 120px
+  const CARD_W = Math.min(isTablet ? 144 : 120, Math.floor((screenW - GRID_H_PAD * 2) * 0.29));
   const [lockedFeature, setLockedFeature] = useState<{ id: string; label: string; unlockMsg?: string } | null>(null);
   const [pendingSound, setPendingSound] = useState<FunnySoundMessage | null>(null);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
@@ -466,14 +466,29 @@ export default function KidHome() {
     }
   }, [tick]);
 
-  // ── Ambient listen — silently record if parent requested ────────────────────
+  // ── Ambient listen — parent-requested voice check-in (DISCLOSED) ─────────────
+  // Google Play policy and basic trust require the child to know they're being
+  // recorded. We show a visible banner on screen AND fire a notification for the
+  // full duration so the child is always aware. The parent-side label says
+  // "voice check-in" not "silent recording."
   const ambientRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [isAmbientRecording, setIsAmbientRecording] = useState(false);
   useEffect(() => {
     const req = kid?.ambientListenRequest;
     if (!req || req.fulfilled) return;
     let cancelled = false;
     (async () => {
       try {
+        // Notify the child visibly before the mic opens.
+        setIsAmbientRecording(true);
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "🎙️ Voice check-in",
+            body: "Your parent requested a 30-second voice check-in. Your microphone is on.",
+            sound: true,
+          },
+          trigger: null, // fire immediately
+        });
         await ambientRecorder.prepareToRecordAsync();
         ambientRecorder.record();
         const secs = req.durationSecs ?? 30;
@@ -488,8 +503,9 @@ export default function KidHome() {
           }});
         }
       } catch {}
+      finally { if (!cancelled) setIsAmbientRecording(false); }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; setIsAmbientRecording(false); };
   }, [kid?.ambientListenRequest?.requestedAt]);
 
   // ── #9 Snapshot capture ───────────────────────────────────────────────────────
@@ -761,6 +777,17 @@ export default function KidHome() {
           <Mascot type={kid.profile.mascot} size={72} animate />
         </View>
       </View>
+
+      {/* ── Ambient recording disclosure banner ── */}
+      {isAmbientRecording && (
+        <View style={styles.recordingBanner}>
+          <View style={styles.recordingDot} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.recordingTitle}>🎙️ Voice check-in active</Text>
+            <Text style={styles.recordingSub}>Your parent requested a quick voice check-in. Microphone is on for 30 seconds.</Text>
+          </View>
+        </View>
+      )}
 
       {/* ── Check-in Request Banner ── */}
       {pendingCheckIn && (
@@ -1042,6 +1069,19 @@ const styles = StyleSheet.create({
     alignItems: "center", ...Shadow.md,
   },
   sosBtnText: { color: "#fff", fontWeight: "900", fontSize: FontSize.base, letterSpacing: 0.5 },
+  // Ambient recording disclosure — must be impossible to miss
+  recordingBanner: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: Colors.error, borderRadius: Radius.xl,
+    padding: Spacing.md, marginBottom: 10,
+  },
+  recordingDot: {
+    width: 14, height: 14, borderRadius: 7, backgroundColor: "#fff",
+    // Pulse is done via opacity animation; static here for APK compatibility
+  },
+  recordingTitle: { fontSize: FontSize.base, fontWeight: "900", color: "#fff" },
+  recordingSub:   { fontSize: FontSize.xs, color: "rgba(255,255,255,0.85)", marginTop: 2, lineHeight: 16 },
+
   checkInCard: {
     backgroundColor: Colors.primary + "12", borderRadius: 20, padding: 18,
     borderWidth: 2, borderColor: Colors.primary + "40", marginBottom: 12, gap: 8,
