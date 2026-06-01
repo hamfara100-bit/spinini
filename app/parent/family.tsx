@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { useData } from "../../lib/data/store";
 import { ScreenContainer } from "../../components/screen-container";
@@ -10,6 +10,19 @@ import { PASTEL_COLORS } from "../../lib/data/types";
 export default function FamilyScreen() {
   const { state, dispatch } = useData();
   const router = useRouter();
+  const [showGamePicker, setShowGamePicker] = React.useState(false);
+
+  function launchGameNight() {
+    if (state.kids.length === 0) {
+      Alert.alert("No kids yet", "Add a child first to start Game Night!");
+      return;
+    }
+    if (state.kids.length === 1) {
+      router.push(`/kid/${state.kids[0].profile.id}/(more)/game-night` as any);
+      return;
+    }
+    setShowGamePicker(true);
+  }
 
   function removeKid(kidId: string) {
     const kid = state.kids.find(k => k.profile.id === kidId);
@@ -31,6 +44,42 @@ export default function FamilyScreen() {
           <Text style={styles.addBtnText}>+ Add Kid</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Game Night */}
+      <TouchableOpacity style={styles.gameNightBtn} onPress={launchGameNight} activeOpacity={0.85}>
+        <Text style={styles.gameNightEmoji}>🎮</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.gameNightTitle}>Game Night</Text>
+          <Text style={styles.gameNightSub}>Play family games together — earn points, have fun!</Text>
+        </View>
+        <Text style={styles.gameNightArrow}>›</Text>
+      </TouchableOpacity>
+
+      {/* Kid picker for Game Night (multi-kid families) */}
+      <Modal visible={showGamePicker} transparent animationType="slide" onRequestClose={() => setShowGamePicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerSheet}>
+            <Text style={styles.pickerTitle}>🎮 Choose a kid's Game Night</Text>
+            <ScrollView>
+              {state.kids.map(kid => (
+                <TouchableOpacity
+                  key={kid.profile.id}
+                  style={styles.pickerRow}
+                  onPress={() => { setShowGamePicker(false); router.push(`/kid/${kid.profile.id}/(more)/game-night` as any); }}
+                  activeOpacity={0.85}
+                >
+                  <Mascot type={kid.profile.mascot} size={40} animate={false} />
+                  <Text style={styles.pickerName}>{kid.profile.name}</Text>
+                  <Text style={styles.pickerArrow}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.pickerCancel} onPress={() => setShowGamePicker(false)}>
+              <Text style={styles.pickerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {state.kids.length === 0 ? (
         <View style={styles.empty}>
@@ -76,6 +125,24 @@ const styles = StyleSheet.create({
   emptyText: { color: Colors.textSecondary, textAlign: "center" },
   bigAddBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: 24, paddingVertical: 12, marginTop: Spacing.sm },
   bigAddBtnText: { color: "#fff", fontWeight: "700", fontSize: FontSize.base },
+  gameNightBtn: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    backgroundColor: Colors.primary, borderRadius: Radius.xl,
+    padding: Spacing.md, marginBottom: Spacing.md, ...Shadow.md,
+  },
+  gameNightEmoji: { fontSize: 36 },
+  gameNightTitle: { fontSize: FontSize.md, fontWeight: "900", color: "#fff" },
+  gameNightSub:   { fontSize: FontSize.xs, color: "rgba(255,255,255,0.8)", marginTop: 2 },
+  gameNightArrow: { fontSize: 28, color: "rgba(255,255,255,0.6)", fontWeight: "300" },
+  // Kid picker modal
+  pickerOverlay:  { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  pickerSheet:    { backgroundColor: "#fff", borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, maxHeight: "70%" },
+  pickerTitle:    { fontSize: FontSize.md, fontWeight: "800", color: Colors.textPrimary, marginBottom: Spacing.md, textAlign: "center" },
+  pickerRow:      { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  pickerName:     { flex: 1, fontSize: FontSize.base, fontWeight: "700", color: Colors.textPrimary },
+  pickerArrow:    { fontSize: 24, color: Colors.textMuted },
+  pickerCancel:   { marginTop: Spacing.md, paddingVertical: 14, alignItems: "center" },
+  pickerCancelText: { color: Colors.primary, fontWeight: "700", fontSize: FontSize.base },
   card: { flexDirection: "row", alignItems: "center", backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: 8, ...Shadow.sm },
   kidName: { fontSize: FontSize.md, fontWeight: "700", color: Colors.textPrimary },
   kidAge: { fontSize: FontSize.sm, color: Colors.textSecondary },
