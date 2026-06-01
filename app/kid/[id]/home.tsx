@@ -419,18 +419,21 @@ export default function KidHome() {
     }
   }, [tick, kid?.usage]);
 
-  // ── #6 Geofence alerts — check on mount + every 5 min ───────────────────────
+  // ── Location capture + geofence — runs ALWAYS (not only when safe zones
+  //    exist) so the parent always has the kid's last location. ───────────────
   useEffect(() => {
-    if (!kid || !kid.safeZones?.length) return;
+    if (!kid) return;
     let cancelled = false;
-    async function checkGeofence() {
+    async function capture() {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted" || cancelled) return;
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (cancelled) return;
+        // This LOCATION_UPDATE syncs to the parent device so 📍 Location shows it.
         dispatch({ type: "LOCATION_UPDATE", kidId: id, location: { lat: loc.coords.latitude, lng: loc.coords.longitude, accuracy: loc.coords.accuracy ?? undefined, timestamp: new Date().toISOString() } });
-        // Check each safe zone
-        for (const zone of kid!.safeZones) {
+        // Geofence checks only if zones exist.
+        for (const zone of (kid!.safeZones ?? [])) {
           const dlat = loc.coords.latitude  - zone.lat;
           const dlng = loc.coords.longitude - zone.lng;
           const distM = Math.sqrt(dlat * dlat + dlng * dlng) * 111_000;
@@ -443,8 +446,8 @@ export default function KidHome() {
         }
       } catch {}
     }
-    checkGeofence();
-    const interval = setInterval(checkGeofence, 5 * 60_000);
+    capture();
+    const interval = setInterval(capture, 2 * 60_000); // every 2 minutes
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 

@@ -1,12 +1,45 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Vibration } from "react-native";
 import { Tabs, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import * as Notifications from "expo-notifications";
 import { Colors } from "../../../lib/theme";
 import { AlarmOverlay } from "../../../components/alarm-overlay";
 import { LockdownOverlay } from "../../../components/lockdown-overlay";
 import { useData } from "../../../lib/data/store";
+
+/**
+ * Fires a system notification + sound + vibration when a NEW parent ping (or
+ * other notification) arrives on the kid device — e.g. via cross-device sync.
+ * Without this the ping is added to the list silently.
+ */
+function KidPingNotifier({ kidId }: { kidId: string }) {
+  const { state } = useData();
+  const kid = state.kids.find(k => k.profile.id === kidId);
+  const notifs = kid?.notifications ?? [];
+  const seen = useRef<Set<string>>(new Set());
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    if (!seeded.current) {
+      notifs.forEach(n => seen.current.add(n.id));
+      seeded.current = true;
+      return;
+    }
+    for (const n of notifs) {
+      if (seen.current.has(n.id)) continue;
+      seen.current.add(n.id);
+      Vibration.vibrate([0, 300, 150, 300]);
+      Notifications.scheduleNotificationAsync({
+        content: { title: `${n.emoji ?? "🔔"} ${n.title}`, body: n.body || "", sound: true },
+        trigger: null,
+      }).catch(() => {});
+    }
+  }, [notifs.length]);
+
+  return null;
+}
 
 // Tab definitions — must match the Tabs.Screen names below
 const TAB_DEFS = [
@@ -171,6 +204,9 @@ export default function KidLayout() {
           options={{ tabBarButton: () => null }}
         />
       </Tabs>
+
+      {/* Surface parent pings as system notifications */}
+      {id && <KidPingNotifier kidId={id} />}
 
       {/* Full-screen alarm overlay — mounts above tabs when parent sends an alarm ping */}
       {id && <AlarmOverlay kidId={id} />}
