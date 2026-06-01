@@ -36,7 +36,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createCommsTransport } from "../comms/transport";
 import type { CommsSyncTransport, SyncEnvelope } from "../comms/transport";
 import type { AppState } from "./types";
-import { uid } from "../utils";
+import { uid, uuidv4 } from "../utils";
 import {
   enqueueEvent, fetchEvents, getCursor, setCursor, QUEUE_PAGE_LIMIT,
 } from "./offline-queue";
@@ -279,7 +279,7 @@ export function useFamilySync(
         return;
       }
 
-      const eventId = uid();
+      const eventId = uuidv4();   // must be a real UUID — sync_events.id is uuid
       // DURABLE: persist for the other device(s) — this is the primary path now.
       void enqueueEvent(fid, eventId, action, self);
       // LIVE: instant delivery to any currently-connected P2P peers (bonus).
