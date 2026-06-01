@@ -33,7 +33,9 @@ export function AdMobBanner({ onHeightChange }: AdMobBannerProps) {
       <BannerAd
         unitId={BANNER_UNIT_ID}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-        requestOptions={{ requestNonPersonalizedAdsOnly: false }}
+        requestOptions={{
+          requestNonPersonalizedAdsOnly: true,   // Families policy: no personalised ad targeting
+        }}
         onAdLoaded={() => {
           setLoaded(true);
           onHeightChange?.(50);

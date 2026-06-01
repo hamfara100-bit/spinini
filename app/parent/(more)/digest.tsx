@@ -36,7 +36,7 @@ function generateDigestText(state: any): string {
     lines.push(`💰 Piggy bank: $${k.money.balance.toFixed(2)}`);
   });
 
-  lines.push(`\n📅 Next digest: Sunday\nSent by Spinini — famkids.app`);
+  lines.push(`\n📅 Next digest: Sunday\nSent by Spinini — spinini.app`);
   return lines.join("\n");
 }
 

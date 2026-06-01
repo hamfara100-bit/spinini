@@ -100,7 +100,7 @@ export default function ConsentScreen() {
         <TouchableOpacity onPress={() => router.push("/privacy-policy" as any)}>
           <Text style={styles.link}>Read Privacy Policy →</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => Linking.openURL("https://famkids.app/terms")}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://spinini.app/terms")}>
           <Text style={styles.link}>Terms of Service →</Text>
         </TouchableOpacity>
       </View>

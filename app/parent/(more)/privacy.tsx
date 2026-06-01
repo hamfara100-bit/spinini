@@ -8,7 +8,7 @@ import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const EFFECTIVE_DATE = "May 20, 2026";
-const CONTACT_EMAIL  = "privacy@famkids.app";
+const CONTACT_EMAIL  = "privacy@spinini.app";
 const APP_NAME       = "Spinini";
 const DEVELOPER      = "Spinini Inc.";
 

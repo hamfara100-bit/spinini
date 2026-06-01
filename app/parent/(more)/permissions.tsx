@@ -235,7 +235,7 @@ export default function PermissionsScreen() {
         <Text style={styles.privacyNoteText}>
           All data collected via these permissions stays on your device. We do not transmit location, screen time, or app usage to our servers. AI features (Buddy chat) send messages to Anthropic over encrypted HTTPS only.
         </Text>
-        <TouchableOpacity onPress={() => Linking.openURL("https://famkids.app/privacy")}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://spinini.app/privacy")}>
           <Text style={styles.privacyLink}>Read full Privacy Policy →</Text>
         </TouchableOpacity>
       </View>

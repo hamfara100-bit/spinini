@@ -65,3 +65,7 @@ gradle-build*.log
 trystero-build*.log
 android/app/src/main/assets/index.android.bundle
 android/app/src/main/assets/*.bundle
+
+# Release keystore — NEVER commit; store securely offline
+android/app/spinini-release.keystore
+android/app/*.keystore

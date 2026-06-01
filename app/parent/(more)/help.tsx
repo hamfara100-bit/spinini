@@ -20,7 +20,7 @@ type Tab = "help" | "guide" | "privacy";
 
 const GUIDE_H = Dimensions.get("window").height * 0.72;
 
-const CONTACT_EMAIL = "privacy@famkids.app";
+const CONTACT_EMAIL = "privacy@spinini.app";
 
 // ─── FAQ data ─────────────────────────────────────────────────────────────────
 

@@ -63,9 +63,9 @@ We have data processing agreements with these providers and they do not receive 
 • Access all data stored in the app (Settings → Data & Storage)
 • Delete your family's data at any time (Settings → Data & Storage → Delete All Data)
 • Opt out of AI features entirely (Settings → AI Features → Disable)
-• Request data deletion by contacting us at privacy@famkids.app
+• Request data deletion by contacting us at privacy@spinini.app
 
-For GDPR users (EU/UK): You also have rights to data portability and to object to processing. Contact us at privacy@famkids.app.`,
+For GDPR users (EU/UK): You also have rights to data portability and to object to processing. Contact us at privacy@spinini.app.`,
   },
   {
     title: "8. Data Retention",
@@ -79,7 +79,7 @@ For GDPR users (EU/UK): You also have rights to data portability and to object t
   },
   {
     title: "10. Contact Us",
-    body: `For privacy questions, data requests, or concerns:\n\nEmail: privacy@famkids.app\nWebsite: famkids.app/privacy`,
+    body: `For privacy questions, data requests, or concerns:\n\nEmail: privacy@spinini.app\nWebsite: famkids.app/privacy`,
   },
 ];
 

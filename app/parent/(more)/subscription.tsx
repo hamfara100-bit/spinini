@@ -123,7 +123,7 @@ export default function SubscriptionScreen() {
       "Restore Purchases",
       current !== "free"
         ? `✅ Your ${PLANS.find(p => p.id === current)?.name} plan has been restored.`
-        : "No active purchases found on this Apple ID.\n\nIf you believe this is an error, contact support@famkids.app.",
+        : "No active purchases found on this Apple ID.\n\nIf you believe this is an error, contact support@spinini.app.",
       [{ text: "OK" }]
     );
   }
@@ -201,7 +201,7 @@ export default function SubscriptionScreen() {
           <Text style={styles.activeBannerText}>
             ✅ {PLANS.find(p => p.id === current)?.name} plan active · renews {expiry}
           </Text>
-          <TouchableOpacity onPress={() => Linking.openURL("https://famkids.app/billing")}>
+          <TouchableOpacity onPress={() => Linking.openURL("https://spinini.app/billing")}>
             <Text style={styles.manageLink}>Manage →</Text>
           </TouchableOpacity>
         </View>
@@ -218,11 +218,11 @@ export default function SubscriptionScreen() {
 
       {/* Legal links — Apple requires ToS + Privacy on the paywall */}
       <View style={styles.legalRow}>
-        <TouchableOpacity onPress={() => Linking.openURL("https://famkids.app/terms")}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://spinini.app/terms")}>
           <Text style={styles.legalLink}>Terms of Service</Text>
         </TouchableOpacity>
         <Text style={styles.legalSep}>·</Text>
-        <TouchableOpacity onPress={() => Linking.openURL("https://famkids.app/privacy")}>
+        <TouchableOpacity onPress={() => Linking.openURL("https://spinini.app/privacy")}>
           <Text style={styles.legalLink}>Privacy Policy</Text>
         </TouchableOpacity>
       </View>
@@ -304,7 +304,7 @@ export default function SubscriptionScreen() {
 
       <Text style={styles.footer}>
         Subscriptions are billed monthly. Cancel anytime. Prices in USD.{"\n"}
-        Contact support@famkids.app for billing issues.
+        Contact support@spinini.app for billing issues.
       </Text>
     </ScreenContainer>
   );

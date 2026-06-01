@@ -42,7 +42,7 @@ export function useAppOpenAd(enabled = true) {
   function loadAd() {
     try {
       const ad = AppOpenAd.createForAdRequest(UNIT_ID, {
-        requestNonPersonalizedAdsOnly: false,
+        requestNonPersonalizedAdsOnly: true,   // Families policy: no personalised ad targeting
       });
 
       const unsubLoaded = ad.addAdEventListener(AdEventType.LOADED, () => {

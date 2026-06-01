@@ -21,7 +21,7 @@ import { getMembership, redeemPairing } from "../../../../lib/family-account";
 
 type Tab = "help" | "privacy";
 
-const CONTACT_EMAIL = "privacy@famkids.app";
+const CONTACT_EMAIL = "privacy@spinini.app";
 
 const FAQS = [
   // ─── Earning & Rewards ───────────────────────────────────────────────────────

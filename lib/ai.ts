@@ -112,7 +112,7 @@ async function tryModel(
     headers: {
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://famkids.app",
+      "HTTP-Referer": "https://spinini.app",
       "X-Title": "Spinini",
     },
     body: JSON.stringify({ model, messages, max_tokens: maxTokens }),
