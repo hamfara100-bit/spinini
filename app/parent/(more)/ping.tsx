@@ -55,7 +55,7 @@ export default function PingScreen() {
 
   return (
     <ScreenContainer scroll>
-      <Text style={styles.title}>🔔 Ping Kids</Text>
+      <Text style={styles.title}>🔔 Ping Family</Text>
 
       {/* ── 🎙️ Listen to Surroundings ── */}
       <View style={ls.section}>

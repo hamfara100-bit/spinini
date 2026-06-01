@@ -246,7 +246,7 @@ export default function ParentQuizScreen() {
     <ScreenContainer scroll>
       {/* Kid selector */}
       {kids.length > 1 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14, flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingVertical: 2, alignItems: "center" }}>
           {kids.map(k => (
             <TouchableOpacity key={k.profile.id} style={[s.kidChip, selectedKidId === k.profile.id && s.kidChipActive]} onPress={() => setSelectedKidId(k.profile.id)}>
               <Text style={[s.kidChipText, selectedKidId === k.profile.id && { color: "#fff" }]}>{k.profile.name}</Text>

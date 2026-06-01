@@ -158,7 +158,7 @@ const PARENT_FEATURES: FeatureDef[] = [
   // Monitoring
   { id: "reports",       emoji: "📊", label: "Reports",        ...C.monitor             },
   { id: "location",      emoji: "🗺️", label: "Location",       ...C.monitor             },
-  { id: "ping",          emoji: "📣", label: "Ping Kid",       ...C.monitor             },
+  { id: "ping",          emoji: "📣", label: "Ping Family",    ...C.monitor             },
 
   // Family & Content
   { id: "fitness",       emoji: "🏃", label: "Fitness & Meals", ...C.content, pulse: true },

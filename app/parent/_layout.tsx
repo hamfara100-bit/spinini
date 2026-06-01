@@ -82,7 +82,7 @@ export default function ParentLayout() {
         <Tabs.Screen name="family" options={{ title: "Family",   tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>👨‍👩‍👧</Text> }} />
         <Tabs.Screen name="callchat" options={{ title: "Call & Chat", tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>💬</Text>, tabBarBadge: unreadChat > 0 ? unreadChat : undefined }} />
         <Tabs.Screen name="notes"  options={{ title: "Notes",    tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📝</Text> }} />
-        <Tabs.Screen name="(more)/ping" options={{ title: "Ping Kid",  tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📣</Text> }} />
+        <Tabs.Screen name="(more)/ping" options={{ title: "Ping Family",  tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📣</Text> }} />
         <Tabs.Screen name="(more)/reports" options={{ title: "Reports",  tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>📈</Text> }} />
         <Tabs.Screen name="agent"  options={{ title: "AI Agent", tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🤖</Text> }} />
         <Tabs.Screen name="(more)" options={{ href: null }} />
