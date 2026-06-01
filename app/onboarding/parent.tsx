@@ -22,6 +22,42 @@ import {
   signUp, signIn, signOut, getMembership, listMembers,
   createFamily, createPairing, type Membership,
 } from "../../lib/family-account";
+import { uid, nowIso } from "../../lib/utils";
+import type { AppAction } from "../../lib/data/types";
+
+const MASCOTS = ["fox","panda","bunny","dino","owl","cat","bear","frog"] as const;
+const COLORS  = ["pink","blue","green","yellow","purple","orange","sky","rose"] as const;
+
+/**
+ * For each Supabase kid member that doesn't yet exist in the local store,
+ * dispatch ADD_KID so the parent dashboard can show and manage them immediately.
+ * P2P sync will overwrite these stubs with the full profile once both devices
+ * are online together.
+ */
+function syncKidsFromSupabase(
+  members: Membership[],
+  existingKids: { profile: { id: string; name: string } }[],
+  dispatch: (a: AppAction) => void,
+) {
+  const existingNames = new Set(existingKids.map(k => k.profile.name.toLowerCase()));
+  members
+    .filter(m => m.role === "kid")
+    .forEach((m, i) => {
+      // Skip if a kid with this name already exists (avoids duplicates on re-open).
+      if (existingNames.has(m.displayName.toLowerCase())) return;
+      dispatch({
+        type: "ADD_KID",
+        payload: {
+          id: uid(),
+          name: m.displayName,
+          age: m.age ?? 10,
+          mascot: MASCOTS[i % MASCOTS.length],
+          color: COLORS[i % COLORS.length],
+          createdAt: nowIso(),
+        },
+      });
+    });
+}
 
 const QR_SIZE = Math.min(Dimensions.get("window").width - 96, 220);
 // QR encodes the plain 6-char code — no custom URL scheme — so a regular
@@ -53,10 +89,15 @@ export default function ParentOnboarding() {
         const m = await getMembership();
         if (!m) { setStep("auth"); return; }
         setMembership(m);
-        // Has family but no kids yet → go straight to QR step
+        // Has family — sync any linked kids into local store, then route.
         const members = await listMembers();
         const hasKids = members.some(m => m.role === "kid");
-        if (hasKids) { router.replace("/parent/dashboard"); return; }
+        if (hasKids) {
+          syncKidsFromSupabase(members, state.kids, dispatch);
+          dispatch({ type: "SETUP_COMPLETE" });
+          router.replace("/parent/dashboard");
+          return;
+        }
         const code = await createPairing("kid", 30);
         setPairingCode(code);
         setStep("qr");
@@ -77,7 +118,7 @@ export default function ParentOnboarding() {
         const hasKids = members.some(m => m.role === "kid");
         if (hasKids) {
           clearInterval(pollRef.current!);
-          // Also mark setupDone so the app knows we're ready
+          syncKidsFromSupabase(members, state.kids, dispatch);
           dispatch({ type: "SETUP_COMPLETE" });
           router.replace("/parent/dashboard");
         }
@@ -100,6 +141,7 @@ export default function ParentOnboarding() {
         setMembership(m);
         const members = await listMembers();
         if (members.some(mx => mx.role === "kid")) {
+          syncKidsFromSupabase(members, state.kids, dispatch);
           dispatch({ type: "SETUP_COMPLETE" });
           router.replace("/parent/dashboard");
         } else {

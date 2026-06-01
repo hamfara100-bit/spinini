@@ -43,8 +43,9 @@ function defaultKidRules(): KidRules {
   return {
     dailyLimitMinutes: 120,
     downtimeWindows: [
-      { id: "bedtime", label: "Bedtime", startTime: "21:00", endTime: "07:00", days: [0,1,2,3,4,5,6], enabled: true },
-      { id: "school", label: "School", startTime: "08:00", endTime: "15:00", days: [1,2,3,4,5], enabled: false },
+      // Both off by default — parent enables them in Screen Rules.
+      { id: "bedtime", label: "Bedtime", startTime: "21:00", endTime: "07:00", days: [0,1,2,3,4,5,6], enabled: false },
+      { id: "school",  label: "School",  startTime: "08:00", endTime: "15:00", days: [1,2,3,4,5],       enabled: false },
     ],
     appRules: [],
     appRewardRules: [],
