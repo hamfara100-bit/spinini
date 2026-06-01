@@ -4,12 +4,12 @@ import {
   TextInput, Alert, ActivityIndicator, Modal,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { useAudioRecorder, useAudioPlayer, createAudioPlayer, RecordingPresets } from "expo-audio";
+import { useAudioRecorder, createAudioPlayer, RecordingPresets } from "expo-audio";
 import { useData, useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid, nowIso } from "../../../../lib/utils";
-import type { FamilyMessage } from "../../../../lib/data/types";
+import type { FamilyMessage, SavedVoiceRecording } from "../../../../lib/data/types";
 
 // ─── Sound Effects ────────────────────────────────────────────────────────────
 
@@ -44,12 +44,16 @@ const EFFECTS: SoundEffect[] = [
   { id: "underwater",emoji: "🌊", label: "Underwater",   rate: 0.65, color: "#2563EB" },
 ];
 
+const fxById = (id: string) => EFFECTS.find(e => e.id === id) ?? EFFECTS[0];
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function VoiceChangerScreen() {
   const { id }        = useLocalSearchParams<{ id: string }>();
-  const { dispatch, state } = useData();
+  const { dispatch } = useData();
   const kid           = useKid(id);
+
+  const recordings = kid?.voiceRecordings ?? [];
 
   // Recording state
   const recorder     = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -59,12 +63,13 @@ export default function VoiceChangerScreen() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Playback
-  const playerRef   = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
-  const [isPlaying, setIsPlaying]   = useState(false);
+  const playerRef     = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
+  const stopTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [playingId, setPlayingId]   = useState<string | null>(null); // "current" or a recording id
   const [selectedFx, setSelectedFx] = useState<SoundEffect>(EFFECTS[0]);
 
-  // Send modal
-  const [showSend, setShowSend]   = useState(false);
+  // Send modal — holds the recording being shared (or "current")
+  const [shareTarget, setShareTarget] = useState<SavedVoiceRecording | "current" | null>(null);
   const [sendNote, setSendNote]   = useState("");
   const [sending, setSending]     = useState(false);
 
@@ -79,6 +84,7 @@ export default function VoiceChangerScreen() {
   // ── Recording ──────────────────────────────────────────────────────────────
 
   async function startRecording() {
+    stopPlayback();
     try {
       setRecordingUri(null);
       setRecordSecs(0);
@@ -92,60 +98,96 @@ export default function VoiceChangerScreen() {
 
   async function stopRecording() {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    let savedUri: string | null = null;
+    let secs = 0;
     try {
       await recorder.stop();
-      const uri = recorder.uri;
-      if (uri) {
-        setRecordingUri(uri);
-      }
+      savedUri = recorder.uri ?? null;
+      secs = recordSecs;
+      if (savedUri) setRecordingUri(savedUri);
     } catch (e) {
       Alert.alert("Error", "Could not save the recording.");
     }
     setIsRecording(false);
+
+    // Auto-save the fresh recording to "My Recordings" so it's never lost.
+    if (savedUri) {
+      const fx = selectedFx;
+      dispatch({
+        type: "VOICE_RECORDING_ADD",
+        kidId: id,
+        recording: {
+          id: uid(),
+          uri: savedUri,
+          durationSecs: Math.max(1, secs),
+          createdAt: nowIso(),
+          fxId: fx.id, fxLabel: fx.label, fxEmoji: fx.emoji, fxRate: fx.rate,
+        },
+      });
+    }
   }
 
-  // ── Playback with effect ────────────────────────────────────────────────────
+  // ── Playback ────────────────────────────────────────────────────────────────
 
   function stopPlayback() {
+    if (stopTimerRef.current) { clearTimeout(stopTimerRef.current); stopTimerRef.current = null; }
     if (playerRef.current) {
       try { playerRef.current.pause(); playerRef.current.remove(); } catch {}
       playerRef.current = null;
     }
-    setIsPlaying(false);
+    setPlayingId(null);
   }
 
-  async function playWithEffect(fx: SoundEffect) {
-    if (!recordingUri) {
-      Alert.alert("Record first!", "Tap the big microphone button to record your voice.");
-      return;
-    }
+  function playUri(uri: string, rate: number, durationSecs: number, tag: string) {
     stopPlayback();
     try {
-      const player = createAudioPlayer(recordingUri);
-      player.setPlaybackRate(fx.rate);
+      const player = createAudioPlayer(uri);
+      try { player.setPlaybackRate(rate); } catch {}
       player.play();
       playerRef.current = player;
-      setIsPlaying(true);
-      setSelectedFx(fx);
-      // Auto-stop when done (approx)
-      const durationMs = (recordSecs + 1) / fx.rate * 1000 + 500;
-      setTimeout(() => { stopPlayback(); }, durationMs);
+      setPlayingId(tag);
+      // Auto-stop a little after the (rate-adjusted) clip should have finished.
+      const durationMs = (Math.max(1, durationSecs) / rate) * 1000 + 700;
+      stopTimerRef.current = setTimeout(() => stopPlayback(), durationMs);
     } catch (e) {
       Alert.alert("Playback Error", "Could not play back the recording.");
     }
   }
 
-  // ── Send ────────────────────────────────────────────────────────────────────
+  // Preview the just-recorded clip with the chosen effect.
+  function playCurrent(fx: SoundEffect) {
+    if (!recordingUri) {
+      Alert.alert("Record first!", "Tap the big microphone button to record your voice.");
+      return;
+    }
+    setSelectedFx(fx);
+    playUri(recordingUri, fx.rate, recordSecs, "current");
+  }
 
-  async function sendToFamily() {
-    if (!recordingUri) return;
+  function playSaved(rec: SavedVoiceRecording) {
+    if (playingId === rec.id) { stopPlayback(); return; }
+    playUri(rec.uri, rec.fxRate, rec.durationSecs, rec.id);
+  }
+
+  // ── Sharing ───────────────────────────────────────────────────────────────
+
+  function openShare(target: SavedVoiceRecording | "current") {
+    setSendNote("");
+    setShareTarget(target);
+  }
+
+  async function confirmShare() {
+    if (!shareTarget) return;
+    const rec = shareTarget === "current"
+      ? { uri: recordingUri, fxEmoji: selectedFx.emoji, fxLabel: selectedFx.label }
+      : shareTarget;
+    if (!rec.uri) { setShareTarget(null); return; }
     setSending(true);
     try {
-      // Send as a FamilyMessage — text describes the voice effect, imageUri holds audio URI
       const message: FamilyMessage = {
         id: uid(),
-        text: `🎙️ Voice message with ${selectedFx.emoji} ${selectedFx.label} effect${sendNote.trim() ? `\n"${sendNote.trim()}"` : ""}`,
-        imageUri: recordingUri,   // repurposed to carry audio URI locally
+        text: `🎙️ Voice message with ${rec.fxEmoji} ${rec.fxLabel} effect${sendNote.trim() ? `\n"${sendNote.trim()}"` : ""}`,
+        imageUri: rec.uri,        // repurposed to carry the audio URI locally
         authorId: id,
         authorName: kid?.profile.name ?? "Kid",
         recipients: [],           // broadcast to whole family
@@ -153,8 +195,8 @@ export default function VoiceChangerScreen() {
         readBy: [id],
       };
       dispatch({ type: "FAMILY_CHAT_PUSH", message });
+      setShareTarget(null);
       setSendNote("");
-      setShowSend(false);
       Alert.alert("Sent! 🎉", "Your voice message was sent to the family chat!");
     } catch {
       Alert.alert("Error", "Could not send the message.");
@@ -162,97 +204,137 @@ export default function VoiceChangerScreen() {
     setSending(false);
   }
 
+  function deleteRecording(rec: SavedVoiceRecording) {
+    if (playingId === rec.id) stopPlayback();
+    Alert.alert("Delete recording?", "This will remove it from your list.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => dispatch({ type: "VOICE_RECORDING_DELETE", kidId: id, recordingId: rec.id }) },
+    ]);
+  }
+
   // ── UI helpers ──────────────────────────────────────────────────────────────
 
   const fmtSecs = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const fmtWhen = (iso: string) =>
+    new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <ScreenContainer>
       <Text style={s.screenTitle}>🎙️ Voice Changer</Text>
-      <Text style={s.screenSub}>Record your voice and play it with fun sound effects!</Text>
+      <Text style={s.screenSub}>Record your voice, play it with fun effects, then save & share with your family!</Text>
 
-      {/* ── Big Record Button ── */}
-      <View style={s.recordSection}>
-        <TouchableOpacity
-          style={[s.recordBtn, isRecording && s.recordBtnActive]}
-          onPress={isRecording ? stopRecording : startRecording}
-          activeOpacity={0.85}
-        >
-          <Text style={s.recordBtnIcon}>{isRecording ? "⏹" : "🎙️"}</Text>
-          <Text style={s.recordBtnLabel}>
-            {isRecording ? `Recording… ${fmtSecs(recordSecs)}` : "Tap to Record"}
-          </Text>
-          {isRecording && <View style={s.recordPulse} />}
-        </TouchableOpacity>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+        {/* ── Big Record Button ── */}
+        <View style={s.recordSection}>
+          <TouchableOpacity
+            style={[s.recordBtn, isRecording && s.recordBtnActive]}
+            onPress={isRecording ? stopRecording : startRecording}
+            activeOpacity={0.85}
+          >
+            <Text style={s.recordBtnIcon}>{isRecording ? "⏹" : "🎙️"}</Text>
+            <Text style={s.recordBtnLabel}>
+              {isRecording ? `Recording… ${fmtSecs(recordSecs)}` : "Tap to Record"}
+            </Text>
+            {isRecording && <View style={s.recordPulse} />}
+          </TouchableOpacity>
 
-        {recordingUri && !isRecording && (
-          <View style={s.recordedPill}>
-            <Text style={s.recordedText}>✅ Recorded {fmtSecs(recordSecs)}</Text>
-          </View>
+          {recordingUri && !isRecording && (
+            <View style={s.recordedPill}>
+              <Text style={s.recordedText}>✅ Saved {fmtSecs(recordSecs)} — pick an effect to play</Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── Effects Grid (preview the latest clip) ── */}
+        {recordingUri && (
+          <>
+            <Text style={s.sectionLabel}>CHOOSE AN EFFECT — TAP TO PLAY</Text>
+            <View style={s.effectsGrid}>
+              {EFFECTS.map(fx => {
+                const isSel = selectedFx.id === fx.id;
+                return (
+                  <TouchableOpacity
+                    key={fx.id}
+                    style={[
+                      s.fxCard,
+                      { borderColor: isSel ? fx.color : "transparent", backgroundColor: isSel ? fx.color + "18" : Colors.cardLight },
+                    ]}
+                    onPress={() => playCurrent(fx)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={s.fxEmoji}>{fx.emoji}</Text>
+                    <Text style={[s.fxLabel, isSel && { color: fx.color }]} numberOfLines={2}>
+                      {fx.label}
+                    </Text>
+                    {playingId === "current" && isSel && (
+                      <View style={[s.playingDot, { backgroundColor: fx.color }]} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Action bar for the latest clip */}
+            <View style={s.actionBar}>
+              <TouchableOpacity style={[s.actionBtn, s.actionBtnPlay]} onPress={() => playCurrent(selectedFx)}>
+                <Text style={s.actionBtnText}>
+                  {playingId === "current" ? "⏸ Playing…" : `▶ Play (${selectedFx.emoji})`}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.actionBtn, s.actionBtnSend]} onPress={() => openShare("current")}>
+                <Text style={s.actionBtnText}>📤 Share</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
-      </View>
 
-      {/* ── Effects Grid ── */}
-      <Text style={s.sectionLabel}>CHOOSE AN EFFECT — TAP TO PLAY</Text>
-
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={s.effectsGrid}
-        showsVerticalScrollIndicator={false}
-      >
-        {EFFECTS.map(fx => {
-          const isSel = selectedFx.id === fx.id;
-          return (
-            <TouchableOpacity
-              key={fx.id}
-              style={[
-                s.fxCard,
-                { borderColor: isSel ? fx.color : "transparent", backgroundColor: isSel ? fx.color + "18" : Colors.cardLight },
-              ]}
-              onPress={() => playWithEffect(fx)}
-              activeOpacity={0.75}
-            >
-              <Text style={s.fxEmoji}>{fx.emoji}</Text>
-              <Text style={[s.fxLabel, isSel && { color: fx.color }]} numberOfLines={2}>
-                {fx.label}
-              </Text>
-              {isPlaying && isSel && (
-                <View style={[s.playingDot, { backgroundColor: fx.color }]} />
-              )}
-            </TouchableOpacity>
-          );
-        })}
+        {/* ── Saved Recordings list ── */}
+        <Text style={[s.sectionLabel, { marginTop: 18 }]}>🎙️ MY RECORDINGS ({recordings.length})</Text>
+        {recordings.length === 0 ? (
+          <View style={s.emptyBox}>
+            <Text style={{ fontSize: 34 }}>📼</Text>
+            <Text style={s.emptyText}>No recordings yet. Tap the microphone to make one — it'll be saved here.</Text>
+          </View>
+        ) : (
+          recordings.map(rec => {
+            const isThisPlaying = playingId === rec.id;
+            return (
+              <View key={rec.id} style={s.recRow}>
+                <TouchableOpacity
+                  style={[s.recPlayBtn, isThisPlaying && { backgroundColor: Colors.error }]}
+                  onPress={() => playSaved(rec)}
+                >
+                  <Text style={s.recPlayIcon}>{isThisPlaying ? "⏹" : "▶"}</Text>
+                </TouchableOpacity>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={s.recTitle} numberOfLines={1}>
+                    {rec.fxEmoji} {rec.fxLabel} • {fmtSecs(rec.durationSecs)}
+                  </Text>
+                  <Text style={s.recWhen}>{fmtWhen(rec.createdAt)}</Text>
+                </View>
+                <TouchableOpacity style={s.recShareBtn} onPress={() => openShare(rec)}>
+                  <Text style={s.recShareText}>📤</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.recDelBtn} onPress={() => deleteRecording(rec)}>
+                  <Text style={s.recDelText}>🗑</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
-      {/* ── Bottom action bar ── */}
-      {recordingUri && (
-        <View style={s.actionBar}>
-          <TouchableOpacity
-            style={[s.actionBtn, s.actionBtnPlay]}
-            onPress={() => playWithEffect(selectedFx)}
-          >
-            <Text style={s.actionBtnText}>
-              {isPlaying ? "⏸ Playing…" : `▶ Play (${selectedFx.emoji} ${selectedFx.label})`}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.actionBtn, s.actionBtnSend]}
-            onPress={() => setShowSend(true)}
-          >
-            <Text style={s.actionBtnText}>📤 Send</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* ── Send Modal ── */}
-      <Modal visible={showSend} transparent animationType="slide" onRequestClose={() => setShowSend(false)}>
+      <Modal visible={shareTarget !== null} transparent animationType="slide" onRequestClose={() => setShareTarget(null)}>
         <View style={s.modalOverlay}>
           <View style={s.modalSheet}>
             <Text style={s.modalTitle}>📤 Send Voice Message</Text>
             <Text style={s.modalSub}>
-              Sending with {selectedFx.emoji} <Text style={{ fontWeight: "800" }}>{selectedFx.label}</Text> effect
+              {shareTarget && shareTarget !== "current"
+                ? <>Sending {shareTarget.fxEmoji} <Text style={{ fontWeight: "800" }}>{shareTarget.fxLabel}</Text> recording</>
+                : <>Sending with {selectedFx.emoji} <Text style={{ fontWeight: "800" }}>{selectedFx.label}</Text> effect</>}
             </Text>
             <Text style={s.modalFieldLabel}>Add a note (optional)</Text>
             <TextInput
@@ -265,10 +347,10 @@ export default function VoiceChangerScreen() {
             />
             <Text style={s.modalInfo}>Your voice message will appear in the family chat 💬</Text>
             <View style={s.modalBtns}>
-              <TouchableOpacity style={s.modalCancelBtn} onPress={() => setShowSend(false)}>
+              <TouchableOpacity style={s.modalCancelBtn} onPress={() => setShareTarget(null)}>
                 <Text style={s.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.modalSendBtn} onPress={sendToFamily} disabled={sending}>
+              <TouchableOpacity style={s.modalSendBtn} onPress={confirmShare} disabled={sending}>
                 {sending ? <ActivityIndicator color="#fff" /> : <Text style={s.modalSendText}>🚀 Send!</Text>}
               </TouchableOpacity>
             </View>
@@ -323,7 +405,7 @@ const s = StyleSheet.create({
   // Effects grid (wrap)
   effectsGrid: {
     flexDirection: "row", flexWrap: "wrap",
-    gap: 8, paddingBottom: 16,
+    gap: 8, paddingBottom: 4,
   },
   fxCard: {
     width: EFFECT_COL_W, alignItems: "center", gap: 4,
@@ -337,16 +419,35 @@ const s = StyleSheet.create({
     width: 8, height: 8, borderRadius: 4,
   },
 
-  // Bottom action bar
+  // Action bar
   actionBar: {
     flexDirection: "row", gap: 10,
     paddingTop: 12, paddingBottom: 4,
-    borderTopWidth: 1, borderTopColor: Colors.border,
   },
   actionBtn:      { flex: 1, borderRadius: Radius.full, paddingVertical: 14, alignItems: "center", ...Shadow.sm },
   actionBtnPlay:  { backgroundColor: Colors.primary },
   actionBtnSend:  { backgroundColor: Colors.success },
   actionBtnText:  { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
+
+  // Saved recordings list
+  emptyBox: { alignItems: "center", gap: 8, paddingVertical: 24, paddingHorizontal: 20 },
+  emptyText: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: "center", lineHeight: 19 },
+  recRow: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg,
+    padding: 10, marginBottom: 8, ...Shadow.sm,
+  },
+  recPlayBtn: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary,
+    alignItems: "center", justifyContent: "center",
+  },
+  recPlayIcon: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  recTitle: { fontSize: FontSize.sm, fontWeight: "800", color: Colors.textPrimary },
+  recWhen:  { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
+  recShareBtn: { padding: 8, marginLeft: 4 },
+  recShareText: { fontSize: 20 },
+  recDelBtn: { padding: 8 },
+  recDelText: { fontSize: 18 },
 
   // Send modal
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },

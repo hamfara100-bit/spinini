@@ -778,18 +778,6 @@ export interface VideoMessage {
   read: boolean;
 }
 
-export type MotionSensitivity = "low" | "medium" | "high";
-export type MotionLevel = "small" | "medium" | "big";
-
-export interface MotionAlert {
-  id: string;
-  sessionId: string;
-  level: MotionLevel;
-  snapshotUri?: string;
-  acknowledged: boolean;
-  timestamp: string;
-}
-
 export interface ColoringPage {
   id: string;
   kidId: string;
@@ -1182,6 +1170,20 @@ export interface VoiceNote {
   createdAt: string;
   from: string;         // parent display name
   listenedAt?: string;  // set when kid plays it
+}
+
+// A recording the kid made in the Voice Changer, saved so it can be replayed
+// (with its sound effect) and shared to the family chat at any time.
+export interface SavedVoiceRecording {
+  id: string;
+  uri: string;          // local file URI from expo-audio recording
+  durationSecs: number;
+  createdAt: string;
+  fxId: string;         // selected sound effect id
+  fxLabel: string;      // e.g. "Chipmunk"
+  fxEmoji: string;      // e.g. "🐿️"
+  fxRate: number;       // playback rate for the effect
+  title?: string;       // optional label the kid gives it
 }
 
 // ─── Check-in Request ────────────────────────────────────────────────────────
@@ -1731,7 +1733,6 @@ export interface KidState {
   safeZones: SafeZone[];
   lastLocation?: LocationSnapshot;
   locationHistory: LocationSnapshot[]; // rolling history for parent reports
-  motionAlerts: MotionAlert[];
   coloringPages: ColoringPage[];
   buddyMessages: AgentMessage[];
   notifications: KidNotification[];
@@ -1756,6 +1757,7 @@ export interface KidState {
   callContacts: CallContact[];
   checkInRequests: CheckInRequest[];
   voiceNotes: VoiceNote[];
+  voiceRecordings?: SavedVoiceRecording[];  // Voice Changer recordings saved for replay + sharing
   kidNotes: KidNote[];
   apologies: ApologyNote[];
   quizzes: ForcedQuiz[];
@@ -2259,8 +2261,6 @@ export type AppAction =
   | { type: "LOCATION_UPDATE"; kidId: string; location: LocationSnapshot }
   | { type: "LOCATION_HISTORY_CLEAR"; kidId: string }
   // Media
-  | { type: "MOTION_ALERT_ADD"; kidId: string; alert: MotionAlert }
-  | { type: "MOTION_ALERT_ACK"; kidId: string; alertId: string }
   | { type: "COLORING_ADD"; kidId: string; page: ColoringPage }
   | { type: "COLORING_UPDATE"; kidId: string; pageId: string; payload: Partial<ColoringPage> }
   | { type: "VIDEO_MESSAGE_ADD"; kidId: string; message: VideoMessage }
@@ -2379,6 +2379,9 @@ export type AppAction =
   | { type: "VOICE_NOTE_ADD"; kidId: string; note: VoiceNote }
   | { type: "VOICE_NOTE_DELETE"; kidId: string; noteId: string }
   | { type: "VOICE_NOTE_LISTENED"; kidId: string; noteId: string }
+  // Voice Changer saved recordings (kid)
+  | { type: "VOICE_RECORDING_ADD"; kidId: string; recording: SavedVoiceRecording }
+  | { type: "VOICE_RECORDING_DELETE"; kidId: string; recordingId: string }
   // Apology / Explain Yourself
   | { type: "APOLOGY_SEND"; kidId: string; note: ApologyNote }
   | { type: "APOLOGY_READ"; kidId: string; apologyId: string }

@@ -56,6 +56,8 @@ const SYNC_DENYLIST = new Set<string>([
   "SET_PIN_RECOVERY_CODE",
   "VAULT_ADD", "VAULT_REMOVE",       // password manager — parent-device-only
   "FAMILY_CHAT_MARK_READ",           // chat read-state is per-device, not synced
+  "VOICE_RECORDING_ADD",             // local audio file URIs — only valid on the kid's own device
+  "VOICE_RECORDING_DELETE",
 ]);
 
 export function isSyncable(action: { type: string }): boolean {

@@ -148,7 +148,6 @@ function newKidState(profile: KidProfile): KidState {
     incidents: [],
     safeZones: [],
     grades: [],
-    motionAlerts: [],
     coloringPages: [],
     buddyMessages: [],
     notifications: [],
@@ -174,6 +173,7 @@ function newKidState(profile: KidProfile): KidState {
     callContacts: [],
     checkInRequests: [],
     voiceNotes: [],
+    voiceRecordings: [],
     kidNotes: [],
     apologies: [],
     quizzes: [],
@@ -927,12 +927,6 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "LOCATION_HISTORY_CLEAR":
       return updateKid(state, action.kidId, k => ({ ...k, locationHistory: [] }));
 
-    case "MOTION_ALERT_ADD":
-      return updateKid(state, action.kidId, k => ({ ...k, motionAlerts: [action.alert, ...k.motionAlerts] }));
-    case "MOTION_ALERT_ACK":
-      return updateKid(state, action.kidId, k => ({
-        ...k, motionAlerts: k.motionAlerts.map(a => a.id === action.alertId ? { ...a, acknowledged: true } : a),
-      }));
     case "COLORING_ADD":
       return updateKid(state, action.kidId, k => ({ ...k, coloringPages: [action.page, ...k.coloringPages] }));
     case "COLORING_UPDATE":
@@ -1485,6 +1479,16 @@ function reducer(state: AppState, action: AppAction): AppState {
         ...k, voiceNotes: (k.voiceNotes ?? []).map(n =>
           n.id === action.noteId ? { ...n, listenedAt: new Date().toISOString() } : n
         ),
+      }));
+
+    // ── Voice Changer saved recordings ─────────────────────────────────────────
+    case "VOICE_RECORDING_ADD":
+      return updateKid(state, action.kidId, k => ({
+        ...k, voiceRecordings: [action.recording, ...(k.voiceRecordings ?? [])].slice(0, 50),
+      }));
+    case "VOICE_RECORDING_DELETE":
+      return updateKid(state, action.kidId, k => ({
+        ...k, voiceRecordings: (k.voiceRecordings ?? []).filter(r => r.id !== action.recordingId),
       }));
 
     // ── Kid Notes ─────────────────────────────────────────────────────────────
