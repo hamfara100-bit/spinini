@@ -136,12 +136,15 @@ export function useFamilySync(
     let cancelled = false;
     let unsub: (() => void) | null = null;
     let unsubPeers: (() => void) | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-    // createCommsTransport("trystero") degrades to loopback if the native stack
-    // or bundling fails; loopback lacks sendSync, so the relay simply stays off.
-    const t = createCommsTransport("trystero");
-    if (!hasSync(t)) return;
-    selfIdRef.current = t.selfPeerId;
+    // A per-session id for this device, used as the queue's origin_peer so we can
+    // skip our OWN rows on drain. Independent of Trystero — the Supabase queue
+    // must work even when WebRTC/Trystero is unavailable (emulators, locked-down
+    // devices). This is the key fix: the durable queue is no longer gated behind
+    // the P2P transport loading successfully.
+    const self = uid();
+    selfIdRef.current = self;
 
     // Apply a remote action exactly once (dedup by eventId). Frames from older
     // peers without an eventId can't be deduped, so they're applied as-is.
@@ -154,7 +157,6 @@ export function useFamilySync(
     };
 
     // Walk the queue from `since`, page by page, invoking `onEvent` for each row.
-    // Returns the newest created_at seen (or `since` if nothing new).
     const walkQueue = async (
       since: string | null,
       onEvent: (e: { id: string; payload: any; origin_peer: string; created_at: string }) => void,
@@ -172,22 +174,24 @@ export function useFamilySync(
       return last;
     };
 
-    // Pull events authored while we were offline and replay the new ones. Our
-    // OWN rows are skipped (already applied locally) but still marked + advance
-    // the cursor so we never reconsider them.
+    // Pull events authored by OTHER devices and replay the new ones. Our own
+    // rows are skipped (already applied locally) but still advance the cursor.
+    let draining = false;
     const drainAndApply = async () => {
-      const self = selfIdRef.current;
-      const start = await getCursor(familyId);
-      const last = await walkQueue(start, (e) => {
-        if (e.origin_peer === self) markApplied(e.id);
-        else applyAction(e.id, e.payload);
-      });
-      if (!cancelled && last && last !== start) await setCursor(familyId, last);
+      if (draining) return;       // avoid overlapping polls
+      draining = true;
+      try {
+        const start = await getCursor(familyId);
+        const last = await walkQueue(start, (e) => {
+          if (e.origin_peer === self) markApplied(e.id);
+          else applyAction(e.id, e.payload);
+        });
+        if (!cancelled && last && last !== start) await setCursor(familyId, last);
+      } finally {
+        draining = false;
+      }
     };
 
-    // After HYDRATing a full snapshot, mark all queued history as already-applied
-    // (without dispatching) and jump the cursor past it — the snapshot already
-    // contains those actions, so replaying them would double-apply.
     const baselineFromSnapshot = async () => {
       const start = await getCursor(familyId);
       const last = await walkQueue(start, (e) => markApplied(e.id));
@@ -206,43 +210,46 @@ export function useFamilySync(
         appliedRef.current = new Set();
       }
 
-      // Drain the durable queue FIRST — it only needs Supabase, not the WebRTC
-      // swarm, so a device that can reach the backend but not its peer still
-      // catches up on offline actions.
+      // ── DURABLE PATH (always on, only needs Supabase) ──────────────────────
+      // Drain once now, then poll every few seconds so cross-device messages
+      // arrive even with no live P2P connection. This is what makes chat /
+      // alarms / remote-lock work between devices without WebRTC.
       await drainAndApply();
       if (cancelled) return;
+      pollTimer = setInterval(() => { if (!cancelled) void drainAndApply(); }, 4000);
 
+      // ── OPTIONAL LIVE PATH (Trystero P2P, instant delivery) ────────────────
+      // Layered on top. If it fails to load/connect, the polling above still
+      // delivers everything — just a few seconds slower.
+      const t = createCommsTransport("trystero");
+      if (!hasSync(t)) return;
       try {
         await t.connect(roomId, "sync");
       } catch {
-        return; // no P2P swarm — live relay stays off; the queue drain above ran.
+        return; // no swarm — durable polling handles it
       }
       if (cancelled) { t.disconnect(); return; }
       transportRef.current = t;
 
       unsub = t.onSync((env: SyncEnvelope) => {
-        if (env.origin === t.selfPeerId) return; // ignore our own echo
+        if (env.origin === self) return; // ignore our own echo
         if (env.kind === "action" && env.payload) {
-          applyAction(env.eventId, env.payload);    // deduped replay
+          applyAction(env.eventId, env.payload);
         } else if (env.kind === "snapshot" && env.payload) {
           rawDispatch({ type: "@@HYDRATE", payload: env.payload });
-          void baselineFromSnapshot();              // snapshot is the baseline
+          void baselineFromSnapshot();
         } else if (env.kind === "request-snapshot") {
-          // Only a configured device answers, so a fresh install doesn't clobber
-          // a set-up family with its empty state.
           const s = getStateRef.current();
           if (s.setupDone) {
-            t.sendSync({ kind: "snapshot", payload: s, origin: t.selfPeerId, seq: ++seqRef.current });
+            t.sendSync({ kind: "snapshot", payload: s, origin: self, seq: ++seqRef.current });
           }
         }
       });
 
-      // When the peer count rises, a device (re)joined: ask for a snapshot AND
-      // drain the queue (it may have come online with events we missed).
       let lastPeers = 1;
       unsubPeers = t.onPeers((n: number) => {
         if (n > lastPeers) {
-          t.sendSync({ kind: "request-snapshot", origin: t.selfPeerId, seq: ++seqRef.current });
+          t.sendSync({ kind: "request-snapshot", origin: self, seq: ++seqRef.current });
           void drainAndApply();
         }
         lastPeers = n;
@@ -251,6 +258,7 @@ export function useFamilySync(
 
     return () => {
       cancelled = true;
+      if (pollTimer) clearInterval(pollTimer);
       unsub?.();
       unsubPeers?.();
       transportRef.current?.disconnect();
@@ -264,13 +272,14 @@ export function useFamilySync(
     broadcast: (action: { type: string }) => {
       const fid = familyIdRef.current;
       const self = selfIdRef.current;
-      // No family, no P2P-capable transport, or a denylisted secret → don't relay.
+      // No family or a denylisted secret → don't relay. (No longer requires the
+      // P2P transport to be up — the durable queue works regardless.)
       if (!fid || !self || !isSyncable(action)) return;
 
       const eventId = uid();
-      // DURABLE: persist for offline peers (best-effort, even if P2P is down now).
+      // DURABLE: persist for the other device(s) — this is the primary path now.
       void enqueueEvent(fid, eventId, action, self);
-      // LIVE: instant delivery to currently-connected peers.
+      // LIVE: instant delivery to any currently-connected P2P peers (bonus).
       const t = transportRef.current;
       if (t && t.status() === "connected") {
         t.sendSync({ kind: "action", payload: action, origin: self, seq: ++seqRef.current, eventId });

@@ -14,12 +14,33 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Notifications from "expo-notifications";
+import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
+import * as Contacts from "expo-contacts";
+import { AudioModule } from "expo-audio";
 import { useData } from "../../lib/data/store";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../lib/theme";
 import { uid, nowIso } from "../../lib/utils";
 import {
   signUp, signIn, signOut, getMembership, redeemPairing,
 } from "../../lib/family-account";
+
+/**
+ * Request every permission the kid device needs up front, so monitoring &
+ * communication features work without prompting later. Each is wrapped so one
+ * denied/unavailable permission never blocks the rest. Notifications + location
+ * are the important ones; camera/mic/photos/contacts are requested too.
+ */
+async function requestAllKidPermissions(): Promise<void> {
+  try { await Notifications.requestPermissionsAsync(); } catch {}
+  try { await ImagePicker.requestCameraPermissionsAsync(); } catch {}
+  try { await AudioModule.requestRecordingPermissionsAsync(); } catch {}
+  try { await Location.requestForegroundPermissionsAsync(); } catch {}
+  try { await Location.requestBackgroundPermissionsAsync(); } catch {}
+  try { await ImagePicker.requestMediaLibraryPermissionsAsync(); } catch {}
+  try { await Contacts.requestPermissionsAsync(); } catch {}
+}
 
 const QR_SCHEME = "spinini://join/";
 
@@ -135,6 +156,10 @@ export default function KidOnboarding() {
           createdAt: nowIso(),
         },
       });
+
+      // Ask for all the permissions the kid device needs (notifications,
+      // location, camera, mic, photos, contacts) before entering the home.
+      await requestAllKidPermissions();
 
       routeToKidHome();
     } catch (e) {
