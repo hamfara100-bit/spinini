@@ -19,6 +19,7 @@ import { ErrorBoundary } from "../components/error-boundary";
 // before any rendering occurs, which is required by expo-task-manager.
 import { startBackgroundTasks, readBgEvents, clearBgEvents } from "../lib/background";
 import { startAppMonitor, stopAppMonitor } from "../lib/app-monitor-bridge";
+import { startForegroundService, requestBatteryExemption, isBatteryExempt } from "../modules/expo-foreground-service/src";
 import { OfflineBanner } from "../components/offline-banner";
 import * as Notifications from "expo-notifications";
 import { getRemainingMinutes } from "../lib/data/logic";
@@ -85,11 +86,29 @@ function BackgroundBridge() {
     } catch {}
   }
 
+  // Prompt once (per device) to exempt the app from battery optimization so the
+  // keep-alive service is not killed during Doze. Guarded so we never nag.
+  async function maybePromptBatteryExemption() {
+    try {
+      if (Platform.OS !== "android") return;
+      if (isBatteryExempt()) return;
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      const asked = await AsyncStorage.getItem("@spinini/battery-exempt-asked");
+      if (asked) return;
+      await AsyncStorage.setItem("@spinini/battery-exempt-asked", "1");
+      requestBatteryExemption();
+    } catch {}
+  }
+
   useEffect(() => {
     // Start background tasks (idempotent — safe to call multiple times)
     startBackgroundTasks();
     // Start app monitor (real usage + blocked app overlay)
     startAppMonitor();
+    // Keep the app process alive so the Supabase sync poll keeps ringing for
+    // alerts/calls/messages even when the screen is off (persistent FG service).
+    startForegroundService();
+    maybePromptBatteryExemption();
     // Flush any events produced while the app was killed/backgrounded
     flushBgEvents();
     // Hide Android system navigation bar (back/home/recents)
@@ -100,6 +119,7 @@ function BackgroundBridge() {
       if (appState.current !== "active" && nextState === "active") {
         flushBgEvents();
         hideNavBar();
+        startForegroundService();
       }
       appState.current = nextState;
     });

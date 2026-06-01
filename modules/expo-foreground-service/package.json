@@ -1,0 +1,9 @@
+{
+  "name": "expo-foreground-service",
+  "version": "1.0.0",
+  "description": "Persistent Android foreground service that keeps Spinini listening for family alerts, calls and messages while the screen is off.",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

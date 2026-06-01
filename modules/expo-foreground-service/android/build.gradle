@@ -1,0 +1,22 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.foregroundservice'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.foregroundservice"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  compileOptions {
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+}
+
+dependencies {
+  implementation "androidx.core:core-ktx:1.12.0"
+}
