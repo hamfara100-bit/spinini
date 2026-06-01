@@ -2,6 +2,7 @@
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, ScrollView, Modal, Alert, Linking,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import { MicButton } from "../../../components/voice-text-input";
 import * as Notifications from "expo-notifications";
@@ -168,7 +169,11 @@ function ChatTab() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
+    >
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterBar}>
         <TouchableOpacity style={[s.filterChip, filter === "all" && s.filterChipActive]} onPress={() => setFilter("all")}>
           <Text style={[s.filterText, filter === "all" && s.filterTextActive]}>👨‍👩‍👧 Everyone</Text>
@@ -229,6 +234,7 @@ function ChatTab() {
         inverted
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: Spacing.sm }}
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={<Text style={s.empty}>No messages yet. Say hi!</Text>}
         renderItem={({ item }) => {
           const isMe = item.authorId === AUTHOR_ID;
@@ -256,7 +262,7 @@ function ChatTab() {
           <Text style={{ color: "#fff", fontSize: 18 }}>↑</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   Modal, ScrollView, FlatList, Linking, Alert, Dimensions,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useLocalSearchParams, useGlobalSearchParams } from "expo-router";
@@ -415,7 +416,11 @@ function KidChatTab({ kidId }: { kidId: string }) {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
+    >
       {peerCount > 1 && (
         <View style={s.liveBanner}>
           <Text style={s.liveBannerText}>🟢 Live — {peerCount - 1} other {peerCount - 1 === 1 ? "device" : "devices"} connected</Text>
@@ -427,6 +432,7 @@ function KidChatTab({ kidId }: { kidId: string }) {
         inverted
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: Spacing.sm }}
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={<Text style={s.chatEmpty}>No messages yet. Say hi to your family! 👋</Text>}
         renderItem={({ item }) => {
           const isMe = item.authorId === kidId;
@@ -453,7 +459,7 @@ function KidChatTab({ kidId }: { kidId: string }) {
           <Text style={{ color: "#fff", fontSize: 18 }}>↑</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
