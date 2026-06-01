@@ -97,6 +97,27 @@ export default function LockScreen() {
     ? fl.message
     : kid?.rules.lockMessage ?? "Screen time is paused 🌙";
 
+  // If the parent locked the device behind a quiz, the kid MUST be able to reach
+  // the quiz to answer it and unlock — otherwise they're stuck. Show a button
+  // straight to the quiz whenever one is waiting.
+  const pendingQuiz = (kid?.quizzes ?? []).find(
+    q => q.status === "pending" || q.status === "in_progress"
+  );
+  const quizUnlockBtn = pendingQuiz ? (
+    <TouchableOpacity
+      style={styles.quizBtn}
+      onPress={() => { if (id) router.push(`/kid/${id}/(more)/quiz` as any); }}
+      accessibilityLabel="Answer quiz to unlock"
+      accessibilityRole="button"
+    >
+      <Text style={styles.quizEmoji}>📝</Text>
+      <View>
+        <Text style={styles.quizLabel}>Answer Quiz to Unlock</Text>
+        <Text style={styles.quizSub} numberOfLines={1}>{pendingQuiz.title}</Text>
+      </View>
+    </TouchableOpacity>
+  ) : null;
+
   // Call family button — always available even when locked
   const callFamilyBtn = (
     <TouchableOpacity
@@ -121,6 +142,7 @@ export default function LockScreen() {
         <View style={styles.funOverlay}>
           <Text style={styles.funMessage}>{message}</Text>
           <Text style={styles.funSub}>Ask a parent to unlock your screen. 🔒</Text>
+          {quizUnlockBtn}
           {callFamilyBtn}
           <TouchableOpacity style={styles.funBackBtn} onPress={() => { setPinError(""); setShowPinGate(true); }}>
             <Text style={styles.funBackText}>← Back to Profiles</Text>
@@ -138,6 +160,7 @@ export default function LockScreen() {
       <Text style={styles.message}>{message}</Text>
       <Text style={styles.sub}>Ask a parent to unlock your screen.</Text>
 
+      {quizUnlockBtn}
       {callFamilyBtn}
 
       {backButton}
@@ -166,6 +189,19 @@ const styles = StyleSheet.create({
   callFamilyEmoji: { fontSize: 36 },
   callFamilyLabel: { fontSize: FontSize.md, fontWeight: "800", color: "#fff" },
   callFamilySub:   { fontSize: FontSize.xs, color: "rgba(255,255,255,0.7)", marginTop: 2 },
+
+  // Answer-quiz-to-unlock button (shown when a quiz is gating the lock)
+  quizBtn: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    backgroundColor: "#FFFFFF",
+    borderRadius: Radius.xl,
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
+    marginTop: Spacing.xl,
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+  },
+  quizEmoji: { fontSize: 36 },
+  quizLabel: { fontSize: FontSize.md, fontWeight: "800", color: Colors.primary },
+  quizSub:   { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, maxWidth: 200 },
 
   // PIN gate modal
   pinOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: Spacing.lg },

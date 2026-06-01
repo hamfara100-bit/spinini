@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Animated, Alert,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useData, useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
@@ -203,6 +203,7 @@ export default function KidQuizScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const kid = useKid(id);
   const { dispatch } = useData();
+  const router = useRouter();
 
   const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("list");
@@ -331,7 +332,12 @@ export default function KidQuizScreen() {
           score={lastScore ?? 0}
           passed={passed}
           onRetry={() => { setQuestionIdx(0); setAnswers({}); setPhase("read"); }}
-          onDismiss={() => { setPhase("list"); setActiveQuizId(null); }}
+          onDismiss={() => {
+            setPhase("list"); setActiveQuizId(null);
+            // Passing unlocks the device — send the kid back to their home so they
+            // aren't left on the quiz screen that was opened from the lock screen.
+            if (passed) router.replace(`/kid/${id}/home` as any);
+          }}
         />
       </ScreenContainer>
     );
