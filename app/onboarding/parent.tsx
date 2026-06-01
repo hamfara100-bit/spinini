@@ -39,16 +39,17 @@ function syncKidsFromSupabase(
   existingKids: { profile: { id: string; name: string } }[],
   dispatch: (a: AppAction) => void,
 ) {
-  const existingNames = new Set(existingKids.map(k => k.profile.name.toLowerCase()));
+  // Dedup by Supabase userId (the shared key) — if we already have a profile
+  // with that ID, skip it. This prevents duplicates on repeated calls.
+  const existingIds = new Set(existingKids.map(k => k.profile.id));
   members
     .filter(m => m.role === "kid")
     .forEach((m, i) => {
-      // Skip if a kid with this name already exists (avoids duplicates on re-open).
-      if (existingNames.has(m.displayName.toLowerCase())) return;
+      if (existingIds.has(m.userId)) return;
       dispatch({
         type: "ADD_KID",
         payload: {
-          id: uid(),
+          id: m.userId,   // ← Supabase userId = shared ID both devices agree on
           name: m.displayName,
           age: m.age ?? 10,
           mascot: MASCOTS[i % MASCOTS.length],

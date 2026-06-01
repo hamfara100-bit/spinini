@@ -25,18 +25,18 @@ const COLORS  = ["pink","blue","green","yellow","purple","orange","sky","rose"] 
 
 function syncKidsFromSupabase(
   members: Membership[],
-  existingKids: { profile: { name: string } }[],
+  existingKids: { profile: { id: string; name: string } }[],
   dispatch: (a: AppAction) => void,
 ) {
-  const existingNames = new Set(existingKids.map(k => k.profile.name.toLowerCase()));
+  const existingIds = new Set(existingKids.map(k => k.profile.id));
   members
     .filter(m => m.role === "kid")
     .forEach((m, i) => {
-      if (existingNames.has(m.displayName.toLowerCase())) return;
+      if (existingIds.has(m.userId)) return;
       dispatch({
         type: "ADD_KID",
         payload: {
-          id: uid(),
+          id: m.userId,
           name: m.displayName,
           age: m.age ?? 10,
           mascot: MASCOTS[i % MASCOTS.length],
@@ -99,12 +99,12 @@ export default function SmartRouter() {
       if (role === "kid") {
         const m = await getMembership().catch(() => null);
         if (!m?.familyId) {
-          // Not linked to a family yet
           router.replace("/onboarding/kid");
           return;
         }
-        // Find the kid's local profile (auto-created during onboarding)
-        const kid = state.kids[0];
+        // Navigate using the Supabase userId (= profile.id after the ID fix)
+        // so the route is always stable even if the local profile is stale.
+        const kid = state.kids.find(k => k.profile.id === m.userId) ?? state.kids[0];
         if (kid) {
           router.replace(`/kid/${kid.profile.id}/home`);
         } else {

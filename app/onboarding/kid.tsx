@@ -18,7 +18,7 @@ import { useData } from "../../lib/data/store";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../lib/theme";
 import { uid, nowIso } from "../../lib/utils";
 import {
-  signUp, signIn, signOut, getMembership, redeemPairing, type Membership,
+  signUp, signIn, signOut, getMembership, redeemPairing,
 } from "../../lib/family-account";
 
 const QR_SCHEME = "spinini://join/";
@@ -115,11 +115,15 @@ export default function KidOnboarding() {
     setBusy(true); setError("");
     try {
       const age = kidAge.trim() ? parseInt(kidAge.trim(), 10) : undefined;
-      const familyId = await redeemPairing(joinCode.trim(), displayName.trim(), Number.isNaN(age as any) ? undefined : age);
+      await redeemPairing(joinCode.trim(), displayName.trim(), Number.isNaN(age as any) ? undefined : age);
 
-      // Create a local kid profile on this device so the kid home has something
-      // to display (it gets synced to the parent via P2P once both are online).
-      const kidId = uid();
+      // Use the Supabase userId as the kid profile ID so it matches exactly
+      // what the parent device creates via syncKidsFromSupabase. Without this,
+      // both devices generate independent random IDs and alarms / chat /
+      // remote-lock never target the right kid.
+      const membership = await getMembership();
+      const kidId = membership?.userId ?? uid();
+
       dispatch({
         type: "ADD_KID",
         payload: {
