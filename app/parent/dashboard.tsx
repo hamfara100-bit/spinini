@@ -1,17 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Animated, Modal, Alert, Dimensions, AppState as RNAppState } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Animated, Modal, Alert, AppState as RNAppState, useWindowDimensions } from "react-native";
 import { MonetizationModal } from "../../components/monetization-modal";
 import { AdMobBanner } from "../../components/admob-banner";
 import { aggregateWebUsage, aggregateAppUsage, aggregateFeatureTaps, daysAgoDate, fmtDuration } from "../../lib/usage-tracker";
 
-const { width: SCREEN_W } = Dimensions.get("window");
 const GRID_H_PAD = 16;
 const GRID_GAP   = 10;
-// Keep tiles phone-sized (~108px) on every screen: 3 columns on a phone, more
-// columns on a tablet. Hardcoding 3 columns made tablet tiles balloon to ~380px.
-const TARGET_TILE = 108;
-const GRID_COLS  = Math.max(3, Math.floor((SCREEN_W - GRID_H_PAD * 2 + GRID_GAP) / (TARGET_TILE + GRID_GAP)));
-const CARD_W     = Math.floor((SCREEN_W - GRID_H_PAD * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS);
 import { useRouter } from "expo-router";
 import { useData } from "../../lib/data/store";
 import { useColors } from "../../hooks/use-colors";
@@ -322,6 +316,10 @@ function KidMostUsed({ kid, onOpenReports }: { kid: KidState; onOpenReports: () 
 }
 
 export default function ParentDashboard() {
+  const { width: screenW } = useWindowDimensions();
+  // More columns on wider screens so cards stay a comfortable tap size.
+  const numCols = screenW >= 1100 ? 6 : screenW >= 840 ? 5 : screenW >= 580 ? 4 : 3;
+  const CARD_W  = Math.floor((screenW - GRID_H_PAD * 2 - GRID_GAP * (numCols - 1)) / numCols);
   const { state, dispatch } = useData();
   const router = useRouter();
   const C = useColors();

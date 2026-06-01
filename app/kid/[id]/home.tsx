@@ -377,9 +377,8 @@ export default function KidHome() {
   const router = useRouter();
   const theme = useColors();
   const { width: screenW } = useWindowDimensions();
-  const isTablet = screenW >= 600;
-  // Tablets get up to 144px cards (more readable); phones cap at 120px
-  const CARD_W = Math.min(isTablet ? 144 : 120, Math.floor((screenW - GRID_H_PAD * 2) * 0.29));
+  const numCols = screenW >= 1100 ? 6 : screenW >= 840 ? 5 : screenW >= 580 ? 4 : 3;
+  const CARD_W  = Math.floor((screenW - GRID_H_PAD * 2 - GRID_GAP * (numCols - 1)) / numCols);
   const [lockedFeature, setLockedFeature] = useState<{ id: string; label: string; unlockMsg?: string } | null>(null);
   const [pendingSound, setPendingSound] = useState<FunnySoundMessage | null>(null);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
@@ -1139,7 +1138,7 @@ const styles = StyleSheet.create({
   voiceBannerDotText: { color: "#fff", fontSize: 11, fontWeight: "800" },
   section: { marginBottom: Spacing.md },
   sectionLabel: { fontSize: FontSize.sm, fontWeight: "700", color: Colors.textSecondary, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
-  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-evenly", rowGap: GRID_GAP },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP },
   searchWrap: {
     flexDirection: "row", alignItems: "center", gap: 8,
     borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.border,

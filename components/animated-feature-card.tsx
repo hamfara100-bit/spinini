@@ -34,12 +34,21 @@ export function AnimatedFeatureCard({ feature, onPress, size = "md", index = 0, 
     lg: { w: 112, h: 122, icon: 60, emoji: 32, label: 11 },
   }[size];
 
-  // When `width` prop is provided, derive all dimensions proportionally
-  const cardW   = width ?? FIXED.w;
-  const cardH   = width ? Math.round(width * 1.09)       : FIXED.h;
-  const iconBox = width ? Math.round(width * 0.52)       : FIXED.icon;
-  const emojiSz = width ? Math.round(width * 0.27)       : FIXED.emoji;
-  const labelSz = width ? Math.max(9, Math.round(width * 0.105)) : FIXED.label;
+  // When `width` prop is provided, derive all dimensions proportionally.
+  // Cap cardW so cards never balloon beyond 150 px on wide screens — extra
+  // space should produce more columns, not bigger cards.
+  const cardW    = width ? Math.min(width, 150) : FIXED.w;
+  const iconBox  = width ? Math.round(cardW * 0.48)              : FIXED.icon;
+  const emojiSz  = width ? Math.round(cardW * 0.26)              : FIXED.emoji;
+  const labelSz  = width ? Math.max(9, Math.round(cardW * 0.105)): FIXED.label;
+  const labelLnH = Math.round(labelSz * 1.35);
+  // Explicit card height guarantees 2-line labels always fit.
+  // Without this, `overflow:"hidden"` clips text on tablets where Android's
+  // text-layout doesn't auto-expand the parent for the 2nd label line.
+  const PADDING_V = 22; // paddingTop(10) + paddingBottom(12)
+  const cardH = width
+    ? PADDING_V + iconBox + 6 + labelLnH * 2    // 6 = gap between icon and label
+    : FIXED.h;
 
   useEffect(() => {
     setTimeout(() => {
@@ -77,6 +86,7 @@ export function AnimatedFeatureCard({ feature, onPress, size = "md", index = 0, 
   return (
     <Animated.View style={{
       width: cardW,
+      height: cardH,
       transform: [{ scale: combinedScale }, { translateY: floatAnim }],
     }}>
       <TouchableOpacity
@@ -95,9 +105,9 @@ export function AnimatedFeatureCard({ feature, onPress, size = "md", index = 0, 
         ]}
       >
         {/* Top-left shine */}
-        <View style={[styles.shineTop, { width: cardW * 0.7, height: cardH * 0.45 }]} pointerEvents="none" />
+        <View style={[styles.shineTop, { width: cardW * 0.7, height: iconBox + 16 }]} pointerEvents="none" />
         {/* Bottom-right depth */}
-        <View style={[styles.shadowInner, { width: cardW * 0.6, height: cardH * 0.4 }]} pointerEvents="none" />
+        <View style={[styles.shadowInner, { width: cardW * 0.6, height: iconBox * 0.8 }]} pointerEvents="none" />
 
         {/* Icon circle */}
         <View style={[styles.iconCircle, { width: iconBox, height: iconBox, borderRadius: iconBox / 2, backgroundColor: iconBg }]}>
@@ -106,7 +116,12 @@ export function AnimatedFeatureCard({ feature, onPress, size = "md", index = 0, 
         </View>
 
         {/* Label */}
-        <Text style={[styles.label, { fontSize: labelSz, lineHeight: Math.round(labelSz * 1.25) }]} numberOfLines={2}>
+        <Text
+          style={[styles.label, { fontSize: labelSz, lineHeight: labelLnH }]}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
           {feature.label}
         </Text>
 
@@ -125,9 +140,9 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 24,
     alignItems: "center",
-    justifyContent: "center",
+    paddingTop: 10,
+    paddingBottom: 12,
     paddingHorizontal: 6,
-    paddingBottom: 8,
     gap: 6,
     overflow: "hidden",
     shadowOffset: { width: 0, height: 6 },
