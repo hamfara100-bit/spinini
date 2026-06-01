@@ -418,7 +418,7 @@ function KidChatTab({ kidId }: { kidId: string }) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior="padding"
       keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
     >
       {peerCount > 1 && (
