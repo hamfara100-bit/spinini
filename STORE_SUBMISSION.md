@@ -37,7 +37,6 @@ REAL-TIME MONITORING
 • GPS location map with Safe Zone alerts
 • Per-app usage reports (requires Android Usage Access)
 • Foreground app detection (requires Accessibility Service)
-• Camera Watch — turn the child's device into a live monitor
 • SOS emergency button with GPS location push notification
 
 CHORES & REWARDS

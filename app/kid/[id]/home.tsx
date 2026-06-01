@@ -236,7 +236,6 @@ const FEATURES: FeatureDef[] = [
   // Row 6 — Family & Social
   { id: "communicate",    emoji: "💬", label: "Call & Chat",    ...C.family,   pulse: true  },
   { id: "album",          emoji: "📸", label: "Memories",       ...C.family                },
-  { id: "watch",          emoji: "📹", label: "Watch",          ...C.family                },
 
   // Personal
   { id: "favorites",      emoji: "❤️", label: "My Favorites",     ...C.rewards               },
@@ -281,7 +280,7 @@ const SECTIONS = [
   { label: "🎨 Create & Express", ids: ["create","journal","ideas","gadgets","favorites"] },
   { label: "📚 School & Learn",   ids: ["school","homework-helper","browser","calculator","reading-list","quiz","family-books","family-movies","family-music"] },
   { label: "🏆 Rewards & Goals",  ids: ["rewards","chores","morning-routine","borrow-time","money","wishes","achievements","trophy-room","fitness"] },
-  { label: "💬 Family & Friends", ids: ["communicate","contacts","album","watch","game-night","family-vote","social","family-calendar","mood","wellbeing","apology","request"] },
+  { label: "💬 Family & Friends", ids: ["communicate","contacts","album","game-night","family-vote","social","family-calendar","mood","wellbeing","apology","request"] },
   { label: "✨ Smart & AI",       ids: ["buddy","stories","sounds","advice","voice-changer"] },
   { label: "⚡ Apps & Tools",     ids: ["apps","alarms","vault","my-reports"] },
   { label: "🚨 Safety & Help",    ids: ["find-phone","checkin","incident","important-info","help"] },

@@ -114,7 +114,6 @@ const SECTIONS = [
     items: [
       { q: "How do I see my child's location?", a: "Go to 📍 Location. The map shows the child's last GPS position. Add Safe Zones to get notified when they enter or leave." },
       { q: "What is the SOS button?", a: "The child's home screen has a 🚨 SOS button. When tapped, it captures GPS location, sends a push notification to you, and shows a red alert banner on your dashboard." },
-      { q: "What is Camera Watch?", a: "👁️ Camera Watch activates the child's device camera as a live monitor. You get motion alerts with snapshot photos." },
       { q: "How do I block an app entirely?", a: "Go to 📱 App Rules → find the app → set to Block. The Accessibility Service detects when the child opens it and immediately shows a lock overlay. You also get a notification." },
       { q: "What is Study Mode?", a: "Study Mode (in ⏱️ Screen Rules → Study Mode tab) blocks entertainment apps (YouTube, TikTok, games, etc.) during study hours. The child sees a blue banner." },
       { q: "What is the Important Info / Document Vault?", a: "📋 Important Info is a 5-tab document vault for each child: 🚨 Emergency contacts & procedures, 🏥 Insurance cards & policy info, 🪪 Identity documents (birth cert, passport), 💊 Medical records & allergies, and 📁 Other important files. Documents can be PIN-locked and optionally shared with co-parents. Expiry dates trigger badge alerts." },
@@ -546,7 +545,6 @@ const DATA_TABLE = [
   ["GPS location (background)", "Location map, Safe Zones", "On your device only"],
   ["Per-app screen time", "Reports, limit enforcement", "On your device only"],
   ["Foreground app name", "Block rule enforcement", "On your device only"],
-  ["Camera snapshots", "Camera Watch sessions", "On your device only"],
   ["Journals, drawings, chores", "Family content", "On your device / your Drive"],
   ["AI chat text (prompts only)", "AI responses", "OpenRouter API (encrypted, not stored)"],
   ["Google OAuth token", "Drive backup", "On your device only"],
@@ -554,7 +552,7 @@ const DATA_TABLE = [
 
 const PERMISSIONS_TABLE = [
   ["Permission", "Purpose", "Required?"],
-  ["Camera", "Camera Watch, chore proofs, profile photos", "Optional"],
+  ["Camera", "Chore photo proofs, profile photos", "Optional"],
   ["Microphone", "Fun Lock voice, story narration", "Optional"],
   ["Location (background)", "Location map, safe zones, SOS", "Optional"],
   ["Notifications", "Homework reminders, pings, SOS alerts", "Recommended"],

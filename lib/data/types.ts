@@ -338,7 +338,7 @@ export const LOCKABLE_FEATURES = [
   "school","browser","calculator","reading-list",
   "fitness","rewards","wishes","money",
   "apps","alarms","vault",
-  "communicate","album","watch","remote-session",
+  "communicate","album","remote-session",
   "favorites","achievements",
 ] as const;
 
@@ -349,7 +349,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   browser: "Safe Browser", calculator: "Calculator", "reading-list": "Books I Read",
   fitness: "Fitness & Meals", rewards: "Rewards", wishes: "Wish List", money: "Piggy Bank",
   apps: "My Apps", alarms: "Alarms & Timer", vault: "Passwords",
-  communicate: "Call & Chat", album: "Memories", watch: "Watch", "remote-session": "Parent View",
+  communicate: "Call & Chat", album: "Memories", "remote-session": "Parent View",
   favorites: "My Favorites", achievements: "Achievements",
 };
 
@@ -780,16 +780,6 @@ export interface VideoMessage {
 
 export type MotionSensitivity = "low" | "medium" | "high";
 export type MotionLevel = "small" | "medium" | "big";
-
-export interface CameraWatchSession {
-  id: string;
-  hostKidId: string;
-  sensitivity: MotionSensitivity;
-  facing: "front" | "back";
-  notificationsEnabled: boolean;
-  active: boolean;
-  startedAt: string;
-}
 
 export interface MotionAlert {
   id: string;
@@ -1741,7 +1731,6 @@ export interface KidState {
   safeZones: SafeZone[];
   lastLocation?: LocationSnapshot;
   locationHistory: LocationSnapshot[]; // rolling history for parent reports
-  cameraWatchSession?: CameraWatchSession;
   motionAlerts: MotionAlert[];
   coloringPages: ColoringPage[];
   buddyMessages: AgentMessage[];
@@ -2270,8 +2259,6 @@ export type AppAction =
   | { type: "LOCATION_UPDATE"; kidId: string; location: LocationSnapshot }
   | { type: "LOCATION_HISTORY_CLEAR"; kidId: string }
   // Media
-  | { type: "CAMERA_WATCH_START"; kidId: string; session: CameraWatchSession }
-  | { type: "CAMERA_WATCH_STOP"; kidId: string }
   | { type: "MOTION_ALERT_ADD"; kidId: string; alert: MotionAlert }
   | { type: "MOTION_ALERT_ACK"; kidId: string; alertId: string }
   | { type: "COLORING_ADD"; kidId: string; page: ColoringPage }

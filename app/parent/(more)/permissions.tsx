@@ -64,7 +64,7 @@ export default function PermissionsScreen() {
       id: "camera",
       emoji: "📷",
       label: "Camera",
-      description: "Used for Camera Watch monitoring, chore photo proof, profile pictures, and memory photos.",
+      description: "Used for chore photo proof, profile pictures, and memory photos.",
       required: false,
       request: async () => { const r = await requestCamera(); return r.status === "granted"; },
     },

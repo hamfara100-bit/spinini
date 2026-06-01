@@ -927,10 +927,6 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "LOCATION_HISTORY_CLEAR":
       return updateKid(state, action.kidId, k => ({ ...k, locationHistory: [] }));
 
-    case "CAMERA_WATCH_START":
-      return updateKid(state, action.kidId, k => ({ ...k, cameraWatchSession: action.session }));
-    case "CAMERA_WATCH_STOP":
-      return updateKid(state, action.kidId, k => ({ ...k, cameraWatchSession: undefined }));
     case "MOTION_ALERT_ADD":
       return updateKid(state, action.kidId, k => ({ ...k, motionAlerts: [action.alert, ...k.motionAlerts] }));
     case "MOTION_ALERT_ACK":

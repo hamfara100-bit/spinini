@@ -158,7 +158,6 @@ const PARENT_FEATURES: FeatureDef[] = [
   // Monitoring
   { id: "reports",       emoji: "📊", label: "Reports",        ...C.monitor             },
   { id: "location",      emoji: "🗺️", label: "Location",       ...C.monitor             },
-  { id: "watch",         emoji: "📹", label: "Camera Watch",   ...C.monitor             },
   { id: "ping",          emoji: "📣", label: "Ping Kid",       ...C.monitor             },
 
   // Family & Content
@@ -226,7 +225,7 @@ const PARENT_FEATURES: FeatureDef[] = [
 
 const SECTIONS = [
   { label: "🔒 Safety & Rules",   ids: ["find-phone","remote-lock","device-guardian","call-guard","bedtime","rules","remote-apps","web-allowlist","morning-routine","teen-mode","stranger-alert","context-screen-time"] },
-  { label: "📊 Monitoring",       ids: ["reports","location","watch","ping","notifications","mood-graph","behavior-insights","leaderboard","social-monitor","weekly-report","mood-insight"] },
+  { label: "📊 Monitoring",       ids: ["reports","location","ping","notifications","mood-graph","behavior-insights","leaderboard","social-monitor","weekly-report","mood-insight"] },
   { label: "📚 School & Content", ids: ["fitness","chores","school-mgmt","learning-apps","wishes","reward-shop","achievements","important-info","medications","quiz","allowance","kid-requests","family-movies","family-music","family-books"] },
   { label: "💬 Family & Growth",  ids: ["communicate","funny-sounds","memories","stories","advice","apology","wellbeing","family-vote","social","family-calendar","co-parenting","family-tree","digital-agreement","game-night"] },
   { label: "✨ AI & Voice",       ids: ["agent","voice-commands","ai-results"] },
