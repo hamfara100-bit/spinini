@@ -23,6 +23,45 @@ import { OfflineBanner } from "../components/offline-banner";
 import * as Notifications from "expo-notifications";
 import { getRemainingMinutes } from "../lib/data/logic";
 
+// ── Global notification behaviour ────────────────────────────────────────────
+// Show every notification (banner + list), play sound, even while the app is in
+// the foreground. Set at module scope so it's active before anything renders.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+/**
+ * Creates the high-importance Android notification channel. On Android, sound /
+ * vibration / heads-up / lock-screen visibility are decided by the CHANNEL, not
+ * the individual notification — so without this, notifications may be silent or
+ * not appear when the screen is off. Overriding the "default" channel (the one
+ * expo-notifications uses when no channelId is given) means EVERY notification
+ * in the app gets sound + vibration + shows on the lock screen.
+ */
+function NotificationSetup() {
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    Notifications.setNotificationChannelAsync("default", {
+      name: "Spinini Alerts",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 350, 200, 350],
+      sound: "default",
+      enableVibrate: true,
+      enableLights: true,
+      lightColor: "#7C5CFF",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: false,
+    }).catch(() => {});
+  }, []);
+  return null;
+}
+
 // Starts background tasks on mount and replays any events they produced
 // while the app was not in the foreground.
 function BackgroundBridge() {
@@ -296,6 +335,7 @@ export default function RootLayout() {
             <QueryClientProvider client={queryClient}>
               <DataProvider>
                 <BackgroundBridge />
+                <NotificationSetup />
                 <AppOpenAdBridge />
                 <SchedulerBridge />
                 <ChatNotifier />
