@@ -70,9 +70,11 @@ export default function ParentOnboarding() {
   const router = useRouter();
 
   const [step, setStep]         = useState<Step>("auth");
-  const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
+  const [authMode, setAuthMode]           = useState<"signup" | "login">("signup");
+  const [email, setEmail]                 = useState("");
+  const [emailConfirm, setEmailConfirm]   = useState("");
+  const [password, setPassword]           = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [familyName, setFamilyName]   = useState("");
   const [pairingCode, setPairingCode] = useState("");
@@ -129,8 +131,15 @@ export default function ParentOnboarding() {
 
   async function handleAuth() {
     if (!email.trim() || password.length < 6) {
-      setError("Enter your email and a password of at least 6 characters.");
-      return;
+      setError("Enter your email and a password of at least 6 characters."); return;
+    }
+    if (authMode === "signup") {
+      if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) {
+        setError("Email addresses don't match."); return;
+      }
+      if (password !== passwordConfirm) {
+        setError("Passwords don't match."); return;
+      }
     }
     setBusy(true); setError("");
     try {
@@ -206,16 +215,31 @@ export default function ParentOnboarding() {
           style={s.input} placeholder="Email" autoCapitalize="none" keyboardType="email-address"
           value={email} onChangeText={setEmail} placeholderTextColor={Colors.textMuted}
         />
+        {authMode === "signup" && (
+          <TextInput
+            style={s.input} placeholder="Confirm email" autoCapitalize="none" keyboardType="email-address"
+            value={emailConfirm} onChangeText={setEmailConfirm} placeholderTextColor={Colors.textMuted}
+          />
+        )}
         <TextInput
           style={s.input} placeholder="Password (min 6 chars)" secureTextEntry
           value={password} onChangeText={setPassword} placeholderTextColor={Colors.textMuted}
         />
+        {authMode === "signup" && (
+          <TextInput
+            style={s.input} placeholder="Confirm password" secureTextEntry
+            value={passwordConfirm} onChangeText={setPasswordConfirm} placeholderTextColor={Colors.textMuted}
+          />
+        )}
 
         <TouchableOpacity style={s.primaryBtn} onPress={handleAuth} disabled={busy} activeOpacity={0.85}>
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryBtnText}>{authMode === "signup" ? "Create Parent Account" : "Log In"}</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => { setAuthMode(m => m === "signup" ? "login" : "signup"); setError(""); }}>
+        <TouchableOpacity onPress={() => {
+          setAuthMode(m => m === "signup" ? "login" : "signup");
+          setEmailConfirm(""); setPasswordConfirm(""); setError("");
+        }}>
           <Text style={s.link}>{authMode === "signup" ? "Already have an account? Log in" : "Need an account? Sign up"}</Text>
         </TouchableOpacity>
       </ScrollView>
