@@ -12,6 +12,7 @@ import { useColors } from "../../hooks/use-colors";
 import { ScreenContainer } from "../../components/screen-container";
 import { Mascot } from "../../components/mascot";
 import { AnimatedFeatureCard, FeatureDef } from "../../components/animated-feature-card";
+import { AddKidQR } from "../../components/add-kid-qr";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../lib/theme";
 import { PASTEL_COLORS } from "../../lib/data/types";
 import type { KidState } from "../../lib/data/types";
@@ -323,6 +324,7 @@ export default function ParentDashboard() {
   const router = useRouter();
   const C = useColors();
   const [badgeKid, setBadgeKid] = useState<KidState | null>(null);
+  const [showAddKid, setShowAddKid] = useState(false);
 
   // ── Ad refresh on foreground ─────────────────────────────────────────────────
   const [adKey, setAdKey] = useState(0);
@@ -415,7 +417,14 @@ export default function ParentDashboard() {
       {/* ── Parent-side ad banner (refreshes on every foreground return, hidden if ad-free) ── */}
       {hasSeenAd && !isAdFree && <AdMobBanner key={adKey} />}
 
-      <Text style={[styles.title, { color: C.isDark ? C.primary : Colors.primary }]}>Parent Dashboard</Text>
+      <View style={styles.dashHeader}>
+        <Text style={[styles.title, { color: C.isDark ? C.primary : Colors.primary }]}>Parent Dashboard</Text>
+        <TouchableOpacity style={styles.addKidChip} onPress={() => setShowAddKid(true)} activeOpacity={0.85}>
+          <Text style={styles.addKidChipText}>＋ Add Kid</Text>
+        </TouchableOpacity>
+      </View>
+
+      <AddKidQR visible={showAddKid} onClose={() => setShowAddKid(false)} />
 
       {/* SOS Alerts Banner */}
       {unackedSos.map(alert => {
@@ -637,7 +646,7 @@ export default function ParentDashboard() {
         {state.kids.length === 0 && (
           <View style={styles.noKids}>
             <Text style={styles.noKidsText}>No kids added yet.</Text>
-            <TouchableOpacity onPress={() => router.push("/setup/add-kid" as any)}>
+            <TouchableOpacity onPress={() => setShowAddKid(true)}>
               <Text style={{ color: Colors.primary, fontWeight: "700" }}>+ Add Kid</Text>
             </TouchableOpacity>
           </View>
@@ -708,6 +717,13 @@ export default function ParentDashboard() {
 
 const styles = StyleSheet.create({
   title: { fontSize: FontSize.xxl, fontWeight: "800", color: Colors.primary, marginBottom: Spacing.md },
+  dashHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  addKidChip: {
+    backgroundColor: Colors.primary + "15", borderRadius: Radius.full,
+    paddingHorizontal: 14, paddingVertical: 7, marginBottom: Spacing.md,
+    borderWidth: 1.5, borderColor: Colors.primary + "40",
+  },
+  addKidChipText: { color: Colors.primary, fontWeight: "800", fontSize: FontSize.sm },
   // Pause All
   pauseRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: Colors.surfaceLight, borderRadius: Radius.xl, padding: Spacing.md, marginBottom: 8, borderWidth: 1.5, borderColor: Colors.border },
   pauseRowActive: { backgroundColor: "#1E40AF", borderColor: "#1E40AF" },

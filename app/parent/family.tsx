@@ -6,11 +6,13 @@ import { ScreenContainer } from "../../components/screen-container";
 import { Mascot } from "../../components/mascot";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../lib/theme";
 import { PASTEL_COLORS } from "../../lib/data/types";
+import { AddKidQR } from "../../components/add-kid-qr";
 
 export default function FamilyScreen() {
   const { state, dispatch } = useData();
   const router = useRouter();
   const [showGamePicker, setShowGamePicker] = React.useState(false);
+  const [showAddKid, setShowAddKid] = React.useState(false);
 
   function launchGameNight() {
     if (state.kids.length === 0) {
@@ -40,10 +42,12 @@ export default function FamilyScreen() {
     <ScreenContainer scroll>
       <View style={styles.header}>
         <Text style={styles.title}>👨‍👩‍👧 Family</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push("/setup/add-kid")}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddKid(true)}>
           <Text style={styles.addBtnText}>+ Add Kid</Text>
         </TouchableOpacity>
       </View>
+
+      <AddKidQR visible={showAddKid} onClose={() => setShowAddKid(false)} />
 
       {/* Game Night */}
       <TouchableOpacity style={styles.gameNightBtn} onPress={launchGameNight} activeOpacity={0.85}>
@@ -85,7 +89,7 @@ export default function FamilyScreen() {
         <View style={styles.empty}>
           <Text style={{ fontSize: 56 }}>👨‍👩‍👧</Text>
           <Text style={styles.emptyText}>No kids added yet. Add your first child!</Text>
-          <TouchableOpacity style={styles.bigAddBtn} onPress={() => router.push("/setup/add-kid")}>
+          <TouchableOpacity style={styles.bigAddBtn} onPress={() => setShowAddKid(true)}>
             <Text style={styles.bigAddBtnText}>+ Add First Kid</Text>
           </TouchableOpacity>
         </View>

@@ -83,12 +83,6 @@ export default function AddKid() {
     if (isFirstKid) dispatch({ type: "SETUP_COMPLETE" });
   }
 
-  // ── "On this device" path ───────────────────────────────────────────────────
-  function handleThisDevice() {
-    addKidToStore();
-    router.replace("/");
-  }
-
   // ── "On their own device" path — generate Supabase pairing QR ──────────────
   async function handleRemoteDevice() {
     setBusy(true);
@@ -166,17 +160,8 @@ export default function AddKid() {
   if (step === "where") {
     return (
       <ScreenContainer>
-        <Text style={styles.title}>Where will {name} use Spinini?</Text>
-        <Text style={styles.whereSub}>Choose how {name} will connect to your family.</Text>
-
-        <TouchableOpacity style={styles.whereCard} onPress={handleThisDevice} activeOpacity={0.85}>
-          <Text style={styles.whereEmoji}>📱</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.whereTitle}>On THIS device</Text>
-            <Text style={styles.whereSub2}>You and {name} share this phone. They tap their avatar on the home screen to enter kid mode.</Text>
-          </View>
-          <Text style={styles.whereArrow}>›</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Invite {name} to their device</Text>
+        <Text style={styles.whereSub}>Every child gets their own Spinini account. Generate a QR code for {name} to scan on their phone.</Text>
 
         <TouchableOpacity style={[styles.whereCard, styles.whereCardRemote]} onPress={handleRemoteDevice} disabled={busy} activeOpacity={0.85}>
           {busy ? <ActivityIndicator color={Colors.primary} style={{ marginRight: 12 }} /> : <Text style={styles.whereEmoji}>📲</Text>}
