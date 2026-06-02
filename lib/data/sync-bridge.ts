@@ -35,6 +35,7 @@ import { useEffect, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createCommsTransport } from "../comms/transport";
 import type { CommsSyncTransport, SyncEnvelope } from "../comms/transport";
+import { supabase } from "../supabase";
 import type { AppState } from "./types";
 import { uid, uuidv4 } from "../utils";
 import {
@@ -142,6 +143,7 @@ export function useFamilySync(
     let unsub: (() => void) | null = null;
     let unsubPeers: (() => void) | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
     // A per-session id for this device, used as the queue's origin_peer so we can
     // skip our OWN rows on drain. Independent of Trystero — the Supabase queue
@@ -216,12 +218,32 @@ export function useFamilySync(
       }
 
       // ── DURABLE PATH (always on, only needs Supabase) ──────────────────────
-      // Drain once now, then poll every few seconds so cross-device messages
-      // arrive even with no live P2P connection. This is what makes chat /
-      // alarms / remote-lock work between devices without WebRTC.
+      // Drain once now. A Supabase Realtime subscription then pushes new queue
+      // rows near-instantly; a slow backstop poll covers anything missed (and
+      // works even when the realtime publication isn't enabled). This replaces
+      // the old 4s poll — far less battery, egress and wake-lock churn.
       await drainAndApply();
       if (cancelled) return;
-      pollTimer = setInterval(() => { if (!cancelled) void drainAndApply(); }, 4000);
+      pollTimer = setInterval(() => { if (!cancelled) void drainAndApply(); }, 20000);
+
+      // Near-instant delivery: drain whenever a row is inserted for this family.
+      try {
+        realtimeChannel = supabase
+          .channel(`sync_events:${familyId}`)
+          .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: "sync_events", filter: `family_id=eq.${familyId}` },
+            () => { if (!cancelled) void drainAndApply(); },
+          )
+          .subscribe((status) => {
+            // On (re)subscribe, drain to catch anything inserted while we were
+            // disconnected.
+            if (status === "SUBSCRIBED" && !cancelled) void drainAndApply();
+          });
+      } catch {
+        // Realtime unavailable (e.g. publication not enabled) — the backstop
+        // poll above still delivers everything, just a bit slower.
+      }
 
       // ── OPTIONAL LIVE PATH (Trystero P2P, instant delivery) ────────────────
       // Layered on top. If it fails to load/connect, the polling above still
@@ -264,6 +286,7 @@ export function useFamilySync(
     return () => {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
+      if (realtimeChannel) { try { supabase.removeChannel(realtimeChannel); } catch {} realtimeChannel = null; }
       unsub?.();
       unsubPeers?.();
       transportRef.current?.disconnect();
