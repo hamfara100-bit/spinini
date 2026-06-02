@@ -1382,6 +1382,7 @@ export interface FamilySocialComment {
   authorId: string; // "parent" | kidId
   text: string;
   createdAt: string;
+  parentCommentId?: string; // set when this comment is a reply to another comment
 }
 
 export interface FamilySocialPost {

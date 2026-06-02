@@ -281,14 +281,18 @@ function CommentsSheet({
 }) {
   const { dispatch } = useData();
   const [text, setText] = useState("");
+  const [replyTo, setReplyTo] = useState<FamilySocialComment | null>(null);
 
   function send() {
     if (!post || !text.trim()) return;
     const comment: FamilySocialComment = {
       id: uid(), authorId: viewerId, text: text.trim(), createdAt: nowIso(),
+      // Replies thread under their top-level comment (one level deep).
+      parentCommentId: replyTo ? (replyTo.parentCommentId ?? replyTo.id) : undefined,
     };
     dispatch({ type: "SOCIAL_COMMENT_ADD", postId: post.id, comment });
     setText("");
+    setReplyTo(null);
   }
 
   function deleteComment(commentId: string) {
@@ -314,32 +318,60 @@ function CommentsSheet({
                 <Text style={{ color: Colors.textSecondary, fontSize: 14, marginTop: 8 }}>Be first to comment!</Text>
               </View>
             )}
-            {[...(post?.comments ?? [])].reverse().map(c => {
-              const isMe = c.authorId === viewerId;
-              const canDel = isMe || viewerIsParent;
-              return (
-                <View key={c.id} style={[cs.comment, isMe && cs.commentMine]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={cs.commentAuthor}>{authorLabel(c.authorId, kids, parentName)}</Text>
-                    <Text style={cs.commentText}>{c.text}</Text>
-                    <Text style={cs.commentTime}>{timeSince(c.createdAt)}</Text>
+            {(() => {
+              const all = post?.comments ?? [];
+              const tops = all.filter(c => !c.parentCommentId);
+              const repliesOf = (cid: string) =>
+                all.filter(c => c.parentCommentId === cid).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+              const renderComment = (c: FamilySocialComment, isReply: boolean) => {
+                const isMe = c.authorId === viewerId;
+                const canDel = isMe || viewerIsParent;
+                return (
+                  <View key={c.id} style={[cs.comment, isMe && cs.commentMine, isReply && cs.commentReply]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={cs.commentAuthor}>{authorLabel(c.authorId, kids, parentName)}</Text>
+                      <Text style={cs.commentText}>{c.text}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 14, marginTop: 2 }}>
+                        <Text style={cs.commentTime}>{timeSince(c.createdAt)}</Text>
+                        <TouchableOpacity onPress={() => setReplyTo(c)}>
+                          <Text style={cs.replyBtn}>Reply</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    {canDel && (
+                      <TouchableOpacity onPress={() => deleteComment(c.id)} style={{ paddingLeft: 8 }}>
+                        <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                  {canDel && (
-                    <TouchableOpacity onPress={() => deleteComment(c.id)} style={{ paddingLeft: 8 }}>
-                      <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
-                    </TouchableOpacity>
-                  )}
+                );
+              };
+              return [...tops].reverse().map(top => (
+                <View key={top.id} style={{ gap: 8 }}>
+                  {renderComment(top, false)}
+                  {repliesOf(top.id).map(r => renderComment(r, true))}
                 </View>
-              );
-            })}
+              ));
+            })()}
           </ScrollView>
+
+          {replyTo && (
+            <View style={cs.replyingBar}>
+              <Text style={cs.replyingText} numberOfLines={1}>
+                ↪ Replying to {authorLabel(replyTo.authorId, kids, parentName)}
+              </Text>
+              <TouchableOpacity onPress={() => setReplyTo(null)}>
+                <Text style={{ color: Colors.textMuted, fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={cs.inputRow}>
             <TextInput
               style={cs.input}
               value={text}
               onChangeText={setText}
-              placeholder="Add a comment…"
+              placeholder={replyTo ? "Write a reply…" : "Add a comment…"}
               returnKeyType="send"
               onSubmitEditing={send}
             />
@@ -809,9 +841,13 @@ const cs = StyleSheet.create({
     flexDirection: "row", backgroundColor: "#252540", borderRadius: 14, padding: 12, gap: 10,
   },
   commentMine: { backgroundColor: Colors.primary + "25" },
+  commentReply: { marginLeft: 26, backgroundColor: "#1E1E36", borderLeftWidth: 2, borderLeftColor: Colors.primary + "66" },
   commentAuthor: { color: "#AAA", fontSize: 11, fontWeight: "700", marginBottom: 2 },
   commentText: { color: "#fff", fontSize: 14 },
-  commentTime: { color: "#666", fontSize: 10, marginTop: 4 },
+  commentTime: { color: "#666", fontSize: 10 },
+  replyBtn: { color: Colors.primary, fontSize: 11, fontWeight: "800" },
+  replyingBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#252540" },
+  replyingText: { color: Colors.primary, fontSize: 12, fontWeight: "700", flex: 1 },
   inputRow: {
     flexDirection: "row", alignItems: "center", gap: 8,
     padding: 12, borderTopWidth: 1, borderTopColor: "#333",

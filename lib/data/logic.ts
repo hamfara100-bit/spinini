@@ -93,27 +93,28 @@ export function getStreak(kid: KidState): number {
  * Combines behavior points, chore completion, school score, and streak.
  */
 export function getThrivingScore(kid: KidState): number {
-  // Behavior points: max 40pts contribution (capped at 200 pts = full 40)
-  const behaviorPts = kid.behavior?.totalPoints ?? 0;
-  const behaviorContrib = Math.min(40, (behaviorPts / 200) * 40);
+  // Start from a neutral-positive baseline: a kid with no data yet is assumed to
+  // be doing fine — only ACTUAL negative signals (bad behavior, missed chores)
+  // pull the score down, while positives push it up.
+  let score = 75;
 
-  // Chore completion this week: % of open chores completed → max 30pts
+  // Behavior points: ±. +200 pts → +15; negative points pull down (to −30).
+  const behaviorPts = kid.behavior?.totalPoints ?? 0;
+  score += Math.max(-30, Math.min(15, (behaviorPts / 200) * 15));
+
+  // Chore completion this week — only counts when chores were actually assigned.
+  // 100% done → +10, 50% → 0, 0% → −10. No chores assigned = no effect (neutral).
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
   const weeklyChores = kid.chores.filter(c => new Date(c.createdAt) >= weekAgo);
-  const completedChores = weeklyChores.filter(c => c.status === "approved").length;
-  const choreContrib = weeklyChores.length > 0
-    ? (completedChores / weeklyChores.length) * 30
-    : 20; // no chores assigned = neutral
+  if (weeklyChores.length > 0) {
+    const rate = weeklyChores.filter(c => c.status === "approved").length / weeklyChores.length;
+    score += (rate - 0.5) * 20;
+  }
 
-  // School behavior score: max 20pts contribution
-  const schoolContrib = 10; // neutral default — school module tracks separately
+  // Streak bonus: up to +10 (7+ day streak).
+  score += Math.min(10, getStreak(kid) * 1.5);
 
-  // Streak bonus: max 10pts (7+ day streak = full 10)
-  const streak = getStreak(kid);
-  const streakContrib = Math.min(10, streak * 1.5);
-
-  const total = Math.round(behaviorContrib + choreContrib + schoolContrib + streakContrib);
-  return Math.min(100, Math.max(0, total));
+  return Math.min(100, Math.max(0, Math.round(score)));
 }
 
 export function getThrivingLabel(score: number): { label: string; color: string; emoji: string } {
