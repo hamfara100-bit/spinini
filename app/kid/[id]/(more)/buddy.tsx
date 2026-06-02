@@ -10,7 +10,7 @@ import { ScreenContainer } from "../../../../components/screen-container";
 import { Mascot } from "../../../../components/mascot";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid } from "../../../../lib/utils";
-import { buddyChat, callAI } from "../../../../lib/ai";
+import { buddyChat, callAI, streamBuddyChat } from "../../../../lib/ai";
 import { AgentMessage, AIResult } from "../../../../lib/data/types";
 import { downloadResult, buildResultSystemPrompt, detectFormat, isContentRequest, FORMAT_META } from "../../../../lib/ai-export";
 
@@ -64,6 +64,7 @@ export default function BuddyScreen() {
   const kid = useKid(id);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingText, setStreamingText] = useState<string | null>(null);
   const [pendingResult, setPendingResult] = useState<PendingResult | null>(null);
   const listRef = useRef<FlatList>(null);
 
@@ -129,14 +130,17 @@ export default function BuddyScreen() {
       } else {
         const allMsgs = [...messages, userMsg];
         const history = allMsgs.slice(-20).map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
-        replyContent = await buddyChat(history, kid?.profile.age ?? 8, buildKidContext());
+        setStreamingText("");
+        replyContent = await streamBuddyChat(history, kid?.profile.age ?? 8, buildKidContext(), setStreamingText);
       }
+      setStreamingText(null);
       dispatch({ type: "BUDDY_MESSAGE_ADD", kidId: id, message: { id: uid(), role: "assistant", content: replyContent, timestamp: new Date().toISOString() } });
     } catch (e: any) {
       const noKey = e?.message?.includes("No AI key");
       dispatch({ type: "BUDDY_MESSAGE_ADD", kidId: id, message: { id: uid(), role: "assistant", content: noKey ? "I can't connect right now 🔌 — ask a parent to check the app settings!" : "Hmm, I couldn't think of a reply. Check your internet and try again! 🤔", timestamp: new Date().toISOString() } });
     } finally {
       setLoading(false);
+      setStreamingText(null);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }
@@ -213,6 +217,14 @@ export default function BuddyScreen() {
                 </Text>
               </View>
             )}
+            ListFooterComponent={streamingText !== null ? (
+              <View style={[styles.bubble, styles.bubbleBot]}>
+                <Text style={{ fontSize: 18, marginBottom: 4 }}>🤖</Text>
+                <Text style={[styles.bubbleText, styles.bubbleTextBot]}>
+                  {streamingText || "…"}
+                </Text>
+              </View>
+            ) : null}
           />
         )}
 
@@ -236,7 +248,7 @@ export default function BuddyScreen() {
           </View>
         )}
 
-        {loading && (
+        {loading && !streamingText && (
           <View style={styles.typing}>
             <ActivityIndicator size="small" color={Colors.primary} />
             <Text style={styles.typingText}>Thinking…</Text>

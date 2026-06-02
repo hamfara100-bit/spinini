@@ -197,6 +197,124 @@ async function directChat(
   throw lastError;
 }
 
+// ─── Streaming (token-by-token) ───────────────────────────────────────────────
+// React Native's fetch can't read a streamed response body, so we use XHR with
+// incremental onprogress (the approach react-native-sse uses) to parse the SSE
+// stream. onToken receives the FULL accumulated text each time, so callers can
+// just set their message text to the latest value.
+
+function streamModel(
+  key: string,
+  model: string,
+  messages: { role: string; content: string }[],
+  maxTokens: number,
+  onToken: (fullText: string) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let full = "";
+    let processedLen = 0;
+    let settled = false;
+    let timedOut = false;
+
+    const timer = setTimeout(() => { timedOut = true; try { xhr.abort(); } catch {} }, REQUEST_TIMEOUT_MS);
+    const finish = (fn: () => void) => { if (settled) return; settled = true; clearTimeout(timer); fn(); };
+
+    function consume() {
+      const text = xhr.responseText ?? "";
+      const fresh = text.slice(processedLen);
+      const nl = fresh.lastIndexOf("\n");
+      if (nl === -1) return;               // no complete line yet
+      processedLen += nl + 1;
+      for (const line of fresh.slice(0, nl).split("\n")) {
+        const l = line.trim();
+        if (!l.startsWith("data:")) continue;
+        const data = l.slice(5).trim();
+        if (!data || data === "[DONE]") continue;
+        try {
+          const delta = JSON.parse(data)?.choices?.[0]?.delta?.content;
+          if (delta) { full += delta; onToken(full); }
+        } catch { /* ignore partial/non-JSON keepalive lines */ }
+      }
+    }
+
+    xhr.open("POST", `${OPENROUTER_BASE}/chat/completions`);
+    xhr.setRequestHeader("Authorization", `Bearer ${key}`);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("HTTP-Referer", "https://spinini.app");
+    xhr.setRequestHeader("X-Title", "Spinini");
+
+    xhr.onreadystatechange = () => {
+      // Skip rate-limited / removed models as soon as we know the status.
+      if (xhr.readyState >= 2 && (xhr.status === 429 || xhr.status === 404)) {
+        finish(() => reject(Object.assign(new Error(`skip:${xhr.status}`), { status: xhr.status })));
+      }
+    };
+    xhr.onprogress = () => { if (!settled && (xhr.status === 200 || xhr.status === 0)) consume(); };
+    xhr.onload = () => finish(() => {
+      if (xhr.status === 429 || xhr.status === 404) { reject(Object.assign(new Error(`skip:${xhr.status}`), { status: xhr.status })); return; }
+      if (xhr.status !== 200) { reject(new Error(`OpenRouter ${xhr.status}: ${(xhr.responseText || "").slice(0, 200)}`)); return; }
+      consume();
+      resolve(full.trim());
+    });
+    xhr.onerror = () => finish(() => reject(timedOut ? Object.assign(new Error("skip:timeout"), { status: 429 }) : new Error("network error")));
+    xhr.onabort = () => finish(() => reject(timedOut ? Object.assign(new Error("skip:timeout"), { status: 429 }) : new Error("aborted")));
+
+    xhr.send(JSON.stringify({ model, messages, max_tokens: maxTokens, stream: true }));
+  });
+}
+
+async function streamDirectChat(
+  messages: { role: string; content: string }[],
+  maxTokens: number,
+  onToken: (fullText: string) => void,
+): Promise<string> {
+  const key = await getBestKey();
+  if (!key) throw new Error("No AI key configured. Add an OpenRouter key in Settings → AI Features.");
+
+  const live = await getLiveFreeModels(key);
+  const liveSet = new Set(live);
+  const fast = FAST_FREE_MODELS.filter(m => liveSet.has(m));
+  const fastSet = new Set(fast);
+  const models = [...fast, ...live.filter(m => !fastSet.has(m))];
+
+  let lastError: Error = new Error("All free models are currently unavailable. Please try again shortly.");
+  for (const model of models) {
+    try {
+      const reply = await streamModel(key, model, messages, maxTokens, onToken);
+      if (reply) return reply;
+    } catch (err) {
+      lastError = err as Error;
+      const status = (err as Error & { status?: number }).status;
+      const skippable = status === 429 || status === 404 || (err as Error).message?.startsWith("skip:");
+      if (!skippable) throw err;
+    }
+  }
+  throw lastError;
+}
+
+/** Streaming generic chat (homework helper, parent agent, …). */
+export async function streamCallAI(
+  messages: { role: "user" | "assistant"; content: string }[],
+  systemPrompt: string,
+  onToken: (fullText: string) => void,
+  maxTokens = 512,
+): Promise<string> {
+  return streamDirectChat([{ role: "system", content: systemPrompt }, ...messages], maxTokens, onToken);
+}
+
+/** Streaming kid AI buddy chat. */
+export async function streamBuddyChat(
+  messages: { role: "user" | "assistant"; content: string }[],
+  kidAge: number,
+  kidContext: string | undefined,
+  onToken: (fullText: string) => void,
+): Promise<string> {
+  const contextNote = kidContext ? `\n\nCurrent info about this child:\n${kidContext}` : "";
+  const systemPrompt = `You are a friendly, safe AI buddy for a ${kidAge}-year-old child. Always be positive, encouraging, and age-appropriate. Never discuss violence, adult topics, or anything unsafe. Use simple language, fun emojis, and keep replies to 2-4 sentences.${contextNote}`;
+  return streamDirectChat([{ role: "system", content: systemPrompt }, ...messages], 384, onToken);
+}
+
 // ─── Kid AI buddy chat ────────────────────────────────────────────────────────
 
 export async function buddyChat(

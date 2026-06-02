@@ -8,7 +8,7 @@ import { useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid, nowIso } from "../../../../lib/utils";
-import { callAI } from "../../../../lib/ai";
+import { streamCallAI } from "../../../../lib/ai";
 
 interface Message {
   id: string;
@@ -41,6 +41,7 @@ export default function HomeworkHelperScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingText, setStreamingText] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   async function send(text?: string) {
@@ -55,12 +56,15 @@ export default function HomeworkHelperScreen() {
     setLoading(true);
     try {
       const aiHistory = history.map(m => ({ role: m.role, content: m.content }));
-      const reply = await callAI(aiHistory, SYSTEM_PROMPT);
+      setStreamingText("");
+      const reply = await streamCallAI(aiHistory, SYSTEM_PROMPT, setStreamingText, 512);
+      setStreamingText(null);
       setMessages(prev => [...prev, { id: uid(), role: "assistant", content: reply }]);
     } catch {
       setMessages(prev => [...prev, { id: uid(), role: "assistant", content: "Sorry, I couldn't connect. Please try again!" }]);
     } finally {
       setLoading(false);
+      setStreamingText(null);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }
@@ -94,7 +98,13 @@ export default function HomeworkHelperScreen() {
               <Text style={[styles.bubbleText, m.role === "user" && styles.bubbleTextUser]}>{m.content}</Text>
             </View>
           ))}
-          {loading && (
+          {streamingText !== null && (
+            <View style={styles.bubbleAI}>
+              <Text style={styles.aiBadge}>📚 Helper</Text>
+              <Text style={styles.bubbleText}>{streamingText || "…"}</Text>
+            </View>
+          )}
+          {loading && !streamingText && (
             <View style={styles.bubbleAI}>
               <ActivityIndicator size="small" color={Colors.primary} />
             </View>
