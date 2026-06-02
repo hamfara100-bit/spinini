@@ -1980,6 +1980,10 @@ export interface AppState {
   wellBeingCategories: WellBeingCategory[];
   wellBeingEntries: WellBeingEntry[];
   familySocialPosts: FamilySocialPost[];
+  // Per-viewer ("parent" | kidId) "last opened the Social feed" markers, used to
+  // badge the Family Social button with unseen posts/likes/comments.
+  socialSeenAt?: Record<string, string>;     // viewerId → ISO timestamp
+  socialSeenLikes?: Record<string, number>;  // viewerId → like count on their posts at last open
   familyVoteTopics: FamilyVoteTopic[];
   locationReminders: LocationReminder[];
   speedAlertSettings: SpeedAlertSettings;
@@ -2274,6 +2278,7 @@ export type AppAction =
   | { type: "AGENT_MESSAGES_CLEAR" }
   | { type: "NOTIFICATION_ADD"; kidId: string; notification: KidNotification }
   | { type: "NOTIFICATION_READ"; kidId: string; notifId: string }
+  | { type: "NOTIFICATIONS_MARK_FEATURE_READ"; kidId: string; feature: string }
   | { type: "NOTIFICATION_ACKNOWLEDGE"; kidId: string; notifId: string }
   | { type: "NOTIFICATION_DELETE"; kidId: string; notifId: string }
   | { type: "NOTIFICATION_CLEAR_ALL"; kidId: string }
@@ -2438,6 +2443,7 @@ export type AppAction =
   | { type: "SOCIAL_COMMENT_ADD"; postId: string; comment: FamilySocialComment }
   | { type: "SOCIAL_COMMENT_DELETE"; postId: string; commentId: string }
   | { type: "SOCIAL_POST_VIEW"; postId: string; viewerId: string }
+  | { type: "SOCIAL_MARK_SEEN"; viewerId: string }
   | { type: "SOCIAL_POST_PIN"; postId: string; pinned: boolean }
   // Morning Routine
   | { type: "MORNING_ROUTINE_UPDATE"; kidId: string; routine: Partial<MorningRoutine> }

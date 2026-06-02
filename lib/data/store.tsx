@@ -4,6 +4,7 @@ import { saveVaultPassword, deleteVaultPassword } from "../vault-store";
 import { uid } from "../utils";
 import { saveRecoveryCode } from "../secure-tokens";
 import { useFamilySync } from "./sync-bridge";
+import { notificationFeature } from "./badges";
 import {
   AppState, AppAction, KidState, KidProfile, KidRules,
   MoneyState, BehaviorScoreState, PermissionLedger, FamilyFilterStatus, CloudBackupConfig,
@@ -287,6 +288,8 @@ export const initialState: AppState = {
   wellBeingCategories: [],
   wellBeingEntries: [],
   familySocialPosts: [],
+  socialSeenAt: {},
+  socialSeenLikes: {},
   familyVoteTopics: [],
   locationReminders: [],
   speedAlertSettings: {
@@ -997,6 +1000,12 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "NOTIFICATION_READ":
       return updateKid(state, action.kidId, k => ({
         ...k, notifications: k.notifications.map(n => n.id === action.notifId ? { ...n, read: true } : n),
+      }));
+    case "NOTIFICATIONS_MARK_FEATURE_READ":
+      return updateKid(state, action.kidId, k => ({
+        ...k, notifications: k.notifications.map(n =>
+          !n.read && notificationFeature(n) === action.feature ? { ...n, read: true } : n
+        ),
       }));
     case "NOTIFICATION_ACKNOWLEDGE":
       return updateKid(state, action.kidId, k => ({
@@ -1927,6 +1936,19 @@ function reducer(state: AppState, action: AppAction): AppState {
           }
         ),
       };
+    case "SOCIAL_MARK_SEEN": {
+      // Snapshot the viewer's current "unseen" baseline: now (for posts/comments)
+      // and the total likes on their own posts (for the likes badge).
+      const posts = state.familySocialPosts ?? [];
+      const likeTotal = posts
+        .filter(p => p.authorId === action.viewerId)
+        .reduce((sum, p) => sum + p.likes.filter(a => a !== action.viewerId).length, 0);
+      return {
+        ...state,
+        socialSeenAt: { ...(state.socialSeenAt ?? {}), [action.viewerId]: new Date().toISOString() },
+        socialSeenLikes: { ...(state.socialSeenLikes ?? {}), [action.viewerId]: likeTotal },
+      };
+    }
     case "SOCIAL_POST_PIN":
       return {
         ...state,

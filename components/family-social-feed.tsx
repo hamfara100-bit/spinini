@@ -591,8 +591,14 @@ export function FamilySocialFeed({
   viewerIsParent: boolean;
   parentName: string;
 }) {
-  const { state } = useData();
+  const { state, dispatch } = useData();
   const kids = state.kids;
+
+  // Opening the feed clears the Family Social badge for this viewer.
+  useEffect(() => {
+    dispatch({ type: "SOCIAL_MARK_SEEN", viewerId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const posts = [...(state.familySocialPosts ?? [])].sort((a, b) => {
     // Pinned first, then newest first

@@ -184,6 +184,88 @@ function ChatNotifier() {
   return null;
 }
 
+/**
+ * Fires a notification when someone likes or comments on YOUR family-social post,
+ * or shares a new post — so activity surfaces even if you're not on the feed.
+ * Runs for both parent and kid (myId from the route; social uses "parent").
+ */
+function SocialNotifier() {
+  const { state } = useData();
+  const pathname = usePathname();
+  const seenLikes = useRef<Set<string>>(new Set());
+  const seenComments = useRef<Set<string>>(new Set());
+  const seenPosts = useRef<Set<string>>(new Set());
+  const seeded = useRef(false);
+
+  const myId = pathname.startsWith("/parent")
+    ? "parent"
+    : (pathname.match(/^\/kid\/([^/]+)/)?.[1] ?? null);
+  const onSocialRef = useRef(false);
+  onSocialRef.current = /\/social/.test(pathname);
+  const myIdRef = useRef(myId);
+  myIdRef.current = myId;
+
+  function nameOf(authorId: string): string {
+    if (authorId === "parent") return state.parentSettings.name || "Parent";
+    return state.kids.find(k => k.profile.id === authorId)?.profile.name ?? "Someone";
+  }
+
+  useEffect(() => {
+    const posts = state.familySocialPosts ?? [];
+    // Seed existing activity on first pass so we don't notify for history.
+    if (!seeded.current) {
+      for (const p of posts) {
+        seenPosts.current.add(p.id);
+        p.likes.forEach(l => seenLikes.current.add(`${p.id}:${l}`));
+        p.comments.forEach(c => seenComments.current.add(c.id));
+      }
+      seeded.current = true;
+      return;
+    }
+    const me = myIdRef.current;
+    for (const p of posts) {
+      // New post by someone else
+      if (!seenPosts.current.has(p.id)) {
+        seenPosts.current.add(p.id);
+        if (me && p.authorId !== me && !onSocialRef.current) {
+          Vibration.vibrate([0, 250, 120, 250]);
+          Notifications.scheduleNotificationAsync({
+            content: { title: `📱 ${nameOf(p.authorId)} posted`, body: p.caption || "New family post", sound: true },
+            trigger: null,
+          }).catch(() => {});
+        }
+      }
+      // Likes + comments on MY post
+      const mine = me && p.authorId === me;
+      for (const liker of p.likes) {
+        const key = `${p.id}:${liker}`;
+        if (seenLikes.current.has(key)) continue;
+        seenLikes.current.add(key);
+        if (mine && liker !== me) {
+          Vibration.vibrate([0, 250]);
+          Notifications.scheduleNotificationAsync({
+            content: { title: `❤️ ${nameOf(liker)} liked your post`, body: p.caption || "Family Social", sound: true },
+            trigger: null,
+          }).catch(() => {});
+        }
+      }
+      for (const c of p.comments) {
+        if (seenComments.current.has(c.id)) continue;
+        seenComments.current.add(c.id);
+        if (mine && c.authorId !== me) {
+          Vibration.vibrate([0, 250, 120, 250]);
+          Notifications.scheduleNotificationAsync({
+            content: { title: `💬 ${nameOf(c.authorId)} commented`, body: c.text || "New comment", sound: true },
+            trigger: null,
+          }).catch(() => {});
+        }
+      }
+    }
+  }, [state.familySocialPosts]);
+
+  return null;
+}
+
 function SchedulerBridge() {
   const { state, dispatch } = useData();
   useAppScheduler(state.kids, dispatch);
@@ -359,6 +441,7 @@ export default function RootLayout() {
                 <AppOpenAdBridge />
                 <SchedulerBridge />
                 <ChatNotifier />
+                <SocialNotifier />
                 <DeepLinkHandler />
                 <ScreenTimeLimitNotifier />
                 <OfflineBanner />

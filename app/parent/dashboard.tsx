@@ -13,6 +13,7 @@ import { ScreenContainer } from "../../components/screen-container";
 import { Mascot } from "../../components/mascot";
 import { AnimatedFeatureCard, FeatureDef } from "../../components/animated-feature-card";
 import { AddKidQR } from "../../components/add-kid-qr";
+import { socialBadgeCount, chatUnreadCount } from "../../lib/data/badges";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../lib/theme";
 import { PASTEL_COLORS } from "../../lib/data/types";
 import type { KidState } from "../../lib/data/types";
@@ -357,6 +358,8 @@ export default function ParentDashboard() {
 
   let cardIndex = 0;
   const installAlertCount = state.kids.reduce((n, k) => n + (k.installAlerts?.length ?? 0), 0);
+  const socialBadge = socialBadgeCount(state, "parent");
+  const chatBadge = chatUnreadCount(state, "__parent__");
 
   // Feature search: when there's a query, show one flat grid of matches instead
   // of the grouped sections (e.g. "ga" → Game Night, ...). Matches label OR id.
@@ -372,7 +375,10 @@ export default function ParentDashboard() {
       : feature.id === "web-allowlist"
       ? "/parent/(more)/dns-filter"
       : `/parent/(more)/${feature.id}`;
-    const badge = feature.id === "remote-apps" ? installAlertCount : undefined;
+    const badge = feature.id === "remote-apps" ? installAlertCount
+      : feature.id === "social" ? (socialBadge || undefined)
+      : feature.id === "communicate" ? (chatBadge || undefined)
+      : undefined;
 
     // Game Night renders via the parent-side wrapper so the parent stays in
     // parent mode (the screen itself lives under the kid layout).

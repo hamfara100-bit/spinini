@@ -59,6 +59,7 @@ const SYNC_DENYLIST = new Set<string>([
   "VOICE_RECORDING_ADD",             // local audio file URIs — only valid on the kid's own device
   "VOICE_RECORDING_DELETE",
   "RELINK_KID_ID",                   // parent-local placeholder→userId reconciliation
+  "SOCIAL_MARK_SEEN",                // per-device read-state for the social badge
 ]);
 
 export function isSyncable(action: { type: string }): boolean {

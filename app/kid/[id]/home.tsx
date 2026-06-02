@@ -17,6 +17,7 @@ import { Mascot } from "../../../components/mascot";
 import { AnimatedFeatureCard, FeatureDef } from "../../../components/animated-feature-card";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
 import { PASTEL_COLORS, FEATURE_LABELS } from "../../../lib/data/types";
+import { socialBadgeCount, chatUnreadCount, kidNotificationBadges } from "../../../lib/data/badges";
 import type { FunnySoundMessage, SosAlert, VoiceNote } from "../../../lib/data/types";
 import { getRemainingMinutes, getUsagePct, getBankBalance, isLocked, isInBedtimeSoftLock, formatMinutes } from "../../../lib/data/logic";
 import { FUNNY_PRESETS } from "../../../lib/funny-sounds";
@@ -371,7 +372,7 @@ const muS = StyleSheet.create({
 export default function KidHome() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const kid = useKid(id);
-  const { dispatch } = useData();
+  const { state, dispatch } = useData();
   const router = useRouter();
   const theme = useColors();
   const { width: screenW } = useWindowDimensions();
@@ -745,8 +746,20 @@ export default function KidHome() {
     ? FEATURES.filter(f => f.label.toLowerCase().includes(q) || f.id.toLowerCase().includes(q))
     : [];
 
+  // Unread badges per feature button: social activity, chat, and any kid
+  // notifications (chore approved, story, advice, etc.) mapped to their feature.
+  const featureBadges: Record<string, number> = (() => {
+    const map: Record<string, number> = { ...kidNotificationBadges(kid.notifications ?? []) };
+    const social = socialBadgeCount(state, id);
+    if (social > 0) map.social = (map.social ?? 0) + social;
+    const chat = chatUnreadCount(state, id);
+    if (chat > 0) map.communicate = (map.communicate ?? 0) + chat;
+    return map;
+  })();
+
   const renderTile = (feature: FeatureDef) => {
     const idx = cardIndex++;
+    const badge = featureBadges[feature.id];
     const isFeatureLocked = !kid.rules.freeMode &&
       !ALWAYS_OPEN.has(feature.id) &&
       (kid.rules.lockedFeatures ?? []).includes(feature.id);
@@ -761,6 +774,7 @@ export default function KidHome() {
             : feature}
           index={idx}
           width={CARD_W}
+          badge={badge}
           onPress={() => {
             if (isFeatureLocked) {
               setLockedFeature({
@@ -769,6 +783,8 @@ export default function KidHome() {
                 unlockMsg: linkedChore?.unlockMessage ?? linkedChore?.title,
               });
             } else {
+              // Opening a feature clears its notification badge.
+              if (badge) dispatch({ type: "NOTIFICATIONS_MARK_FEATURE_READ", kidId: id, feature: feature.id });
               router.push(`/kid/${id}/(more)/${feature.id}` as any);
             }
           }}
