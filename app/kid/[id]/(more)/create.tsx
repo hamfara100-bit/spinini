@@ -331,8 +331,20 @@ export default function CreateScreen() {
           <StopMotionStudio
             kidId={id}
             projects={kid?.stopMotionProjects ?? []}
-            onSave={project => dispatch({ type: "ADD_STOP_MOTION", kidId: id, project })}
-            onUpdate={(projectId, payload) => dispatch({ type: "UPDATE_STOP_MOTION", kidId: id, projectId, payload })}
+            onSave={async project => {
+              // Upload every frame so the flipbook plays on the parent's device.
+              const uris = await uploadMediaMany(project.frames.map(f => f.uri), { folder: "stopmotion" });
+              const frames = project.frames.map((f, i) => ({ ...f, uri: uris[i] }));
+              dispatch({ type: "ADD_STOP_MOTION", kidId: id, project: { ...project, frames } });
+            }}
+            onUpdate={async (projectId, payload) => {
+              let p = payload;
+              if (payload.frames) {
+                const uris = await uploadMediaMany(payload.frames.map(f => f.uri), { folder: "stopmotion" });
+                p = { ...payload, frames: payload.frames.map((f, i) => ({ ...f, uri: uris[i] })) };
+              }
+              dispatch({ type: "UPDATE_STOP_MOTION", kidId: id, projectId, payload: p });
+            }}
             onDelete={projectId => dispatch({ type: "REMOVE_STOP_MOTION", kidId: id, projectId })}
             onShare={project => openFlipbookShare(project.frames?.[0]?.uri, project.title)}
             onSubmit={projectId => {

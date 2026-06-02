@@ -14,6 +14,7 @@ import { Mascot } from "../../components/mascot";
 import { Colors, FontSize, Radius, Spacing, Shadow } from "../../lib/theme";
 import { MascotType, PastelColor, PASTEL_COLORS } from "../../lib/data/types";
 import { uid } from "../../lib/utils";
+import { uploadMedia } from "../../lib/media-upload";
 import { getMembership, createPairing } from "../../lib/family-account";
 
 const MASCOTS: MascotType[] = ["fox","panda","bunny","dino","owl","cat","bear","frog"];
@@ -75,10 +76,12 @@ export default function AddKid() {
     return true;
   }
 
-  function addKidToStore() {
+  async function addKidToStore() {
+    // Upload the profile photo so it shows on the kid's own device too.
+    const sharedPhoto = photoUri ? (await uploadMedia(photoUri, { folder: "profiles" })) ?? photoUri : undefined;
     dispatch({
       type: "ADD_KID",
-      payload: { id: uid(), name: name.trim(), age: parseInt(age), mascot, color, photoUri: photoUri ?? undefined, createdAt: new Date().toISOString() },
+      payload: { id: uid(), name: name.trim(), age: parseInt(age), mascot, color, photoUri: sharedPhoto, createdAt: new Date().toISOString() },
     });
     if (isFirstKid) dispatch({ type: "SETUP_COMPLETE" });
   }
@@ -97,7 +100,7 @@ export default function AddKid() {
         return;
       }
       const code = await createPairing("kid", 30);
-      addKidToStore();
+      await addKidToStore();
       setPairingCode(code);
       setStep("qr");
     } catch (e) {
