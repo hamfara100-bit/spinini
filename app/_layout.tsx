@@ -173,9 +173,13 @@ function ChatNotifier() {
       seen.current.add(m.id);
       if (myIdRef.current && m.authorId === myIdRef.current) continue; // my own message
       if (onChatRef.current) continue;                                  // already viewing chat
+      // Land on the actual Call & Chat tab (robust); skip if we can't tell who we
+      // are (myId null) so we never push a `/kid/null/...` blank route.
       const chatRoute = myIdRef.current === "__parent__"
-        ? "/parent/(more)/communicate"
-        : `/kid/${myIdRef.current}/(more)/communicate`;
+        ? "/parent/callchat"
+        : myIdRef.current
+        ? `/kid/${myIdRef.current}/callchat`
+        : undefined;
       Vibration.vibrate([0, 350, 180, 350]);
       Notifications.scheduleNotificationAsync({
         content: { title: `💬 ${m.authorName}`, body: m.text || (m.imageUri ? "📷 Photo" : m.audioUri ? "🎙️ Voice message" : "New message"), sound: true, data: { route: chatRoute } },
@@ -280,10 +284,11 @@ function NotificationRouter() {
   useEffect(() => {
     function go(resp: Notifications.NotificationResponse | null) {
       const route = (resp?.notification?.request?.content?.data as any)?.route;
-      if (route && typeof route === "string") {
-        // Small delay so the navigation tree is mounted on cold start.
-        setTimeout(() => { try { router.push(route as any); } catch {} }, 300);
-      }
+      // Guard against malformed routes (e.g. a null/undefined id slipped in)
+      // which would render a blank "unmatched" screen.
+      if (typeof route !== "string" || !route || route.includes("undefined") || route.includes("null")) return;
+      // Small delay so the navigation tree is mounted on cold start.
+      setTimeout(() => { try { router.navigate(route as any); } catch {} }, 400);
     }
     const sub = Notifications.addNotificationResponseReceivedListener(go);
     Notifications.getLastNotificationResponseAsync().then(go).catch(() => {});
