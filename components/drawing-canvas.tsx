@@ -135,6 +135,8 @@ export function DrawingCanvas({
   const stickersRef = useRef<Sticker[]>(initialStickers);
   const pathsRef = useRef<DrawingPath[]>(initialPaths);
   const dragStickerIdRef = useRef<string | null>(null);
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartSizeRef = useRef<number>(0);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep refs in sync
@@ -241,6 +243,27 @@ export function DrawingCanvas({
 
       onPanResponderMove: (e) => {
         const { locationX: x, locationY: y } = e.nativeEvent;
+        const touches = e.nativeEvent.touches;
+
+        // ── Two-finger pinch resizes the grabbed sticker ──
+        if (touches && touches.length >= 2 && dragStickerIdRef.current) {
+          const t1 = touches[0], t2 = touches[1];
+          const dist = Math.hypot(t1.pageX - t2.pageX, t1.pageY - t2.pageY);
+          const activeId = dragStickerIdRef.current;
+          if (pinchStartDistRef.current == null) {
+            pinchStartDistRef.current = dist;
+            pinchStartSizeRef.current = stickersRef.current.find(s => s.id === activeId)?.size ?? stickerSizeRef.current;
+          } else if (pinchStartDistRef.current > 0) {
+            const newSize = Math.max(24, Math.min(260, pinchStartSizeRef.current * (dist / pinchStartDistRef.current)));
+            setStickers(s => {
+              const next = s.map(st => st.id === activeId ? { ...st, size: newSize } : st);
+              stickersRef.current = next;
+              return next;
+            });
+          }
+          return; // don't also drag while pinching
+        }
+        pinchStartDistRef.current = null; // back to ≤1 finger
 
         if (dragStickerIdRef.current) {
           setStickers(s => {
@@ -261,6 +284,7 @@ export function DrawingCanvas({
       },
 
       onPanResponderRelease: () => {
+        pinchStartDistRef.current = null;
         if (dragStickerIdRef.current) {
           dragStickerIdRef.current = null;
           return;

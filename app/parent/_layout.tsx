@@ -11,6 +11,7 @@ import { Colors, FontSize, Radius, Spacing } from "../../lib/theme";
 import MobileAds from "react-native-google-mobile-ads";
 import { AdMobBanner } from "../../components/admob-banner";
 import { ParentFindPhoneOverlay } from "../../components/parent-find-phone-overlay";
+import { ParentSosOverlay } from "../../components/parent-sos-overlay";
 
 type AuthMethod = "choose" | "pin";
 
@@ -58,6 +59,7 @@ export default function ParentLayout() {
     return (
       <>
         <ParentFindPhoneOverlay />
+        <ParentSosOverlay />
         <Tabs screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: Colors.primary,

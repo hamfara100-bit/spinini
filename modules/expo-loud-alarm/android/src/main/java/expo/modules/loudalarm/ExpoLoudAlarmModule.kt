@@ -1,7 +1,9 @@
 package expo.modules.loudalarm
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
@@ -10,6 +12,13 @@ import expo.modules.kotlin.modules.ModuleDefinition
 
 class ExpoLoudAlarmModule : Module() {
   private val context get() = requireNotNull(appContext.reactContext)
+  private var alarmPlayer: MediaPlayer? = null
+
+  private fun stopLoopInternal() {
+    try { alarmPlayer?.stop() } catch (_: Exception) {}
+    try { alarmPlayer?.release() } catch (_: Exception) {}
+    alarmPlayer = null
+  }
 
   override fun definition() = ModuleDefinition {
     Name("ExpoLoudAlarm")
@@ -51,28 +60,41 @@ class ExpoLoudAlarmModule : Module() {
     }
 
     /**
-     * Play the system alarm ringtone once. Useful for quick test.
+     * Play the system alarm ringtone in a LOOP on the alarm stream until
+     * stopSystemAlarm() is called. Uses MediaPlayer so it never stops on its
+     * own (a plain Ringtone plays once).
      */
     Function("playSystemAlarm") {
       try {
+        stopLoopInternal()
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
           ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+          ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         if (uri != null) {
-          val ringtone = RingtoneManager.getRingtone(context, uri)
-          ringtone?.play()
+          val mp = MediaPlayer()
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            mp.setAudioAttributes(
+              AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            )
+          } else {
+            @Suppress("DEPRECATION")
+            mp.setAudioStreamType(AudioManager.STREAM_ALARM)
+          }
+          mp.setDataSource(context, uri)
+          mp.isLooping = true
+          mp.prepare()
+          mp.start()
+          alarmPlayer = mp
         }
       } catch (_: Exception) {}
     }
 
-    /** Stop any playing system ringtone */
+    /** Stop the looping alarm. */
     Function("stopSystemAlarm") {
-      try {
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-        if (uri != null) {
-          val ringtone = RingtoneManager.getRingtone(context, uri)
-          ringtone?.stop()
-        }
-      } catch (_: Exception) {}
+      stopLoopInternal()
     }
 
     /** Check if the app has notification policy (DND override) access */

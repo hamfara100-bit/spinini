@@ -589,44 +589,13 @@ export default function KidHome() {
             id: uid(), kidId: id, kidName: kid.profile.name,
             lat, lng, timestamp: nowIso(), acknowledged: false,
           };
+          // Only dispatch the alert — it syncs to the PARENT device, which raises
+          // the loud SOS alarm + notification. The sender (kid) gets NO push for
+          // their own alert; just a quiet on-screen confirmation.
           dispatch({ type: "SOS_ALERT", alert: sosAlert });
-          dispatch({
-            type: "NOTIFICATION_ADD", kidId: id,
-            notification: {
-              id: uid(), kidId: id, kind: "ping",
-              title: "🚨 SOS Sent", body: "Your parents have been notified. Help is coming!",
-              read: false, createdAt: nowIso(),
-            },
-          });
-
-          // Local push notification to parent device
-          let notifOk = false;
-          try {
-            await Notifications.scheduleNotificationAsync({
-              content: {
-                title: `🚨 SOS from ${kid.profile.name}!`,
-                body: lat
-                  ? `Location: ${lat.toFixed(4)}, ${lng!.toFixed(4)}`
-                  : "Location unavailable — check on your child NOW!",
-                sound: true,
-              },
-              trigger: null,
-            });
-            notifOk = true;
-          } catch {}
 
           setSosLoading(false);
-
-          if (notifOk) {
-            Alert.alert("✅ SOS Sent!", "Your parents have been notified and are on their way.");
-          } else {
-            // SOS was still recorded in the app even if push notification failed
-            Alert.alert(
-              "⚠️ SOS Sent (Partial)",
-              "Your SOS was recorded in the app, but the push notification may not have reached your parent. Call them directly if possible!",
-              [{ text: "OK" }]
-            );
-          }
+          Alert.alert("✅ SOS Sent!", "Your parents have been notified and are on their way.");
         },
       },
     ]);

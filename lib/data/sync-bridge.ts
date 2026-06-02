@@ -218,15 +218,19 @@ export function useFamilySync(
       }
 
       // ── DURABLE PATH (always on, only needs Supabase) ──────────────────────
-      // Drain once now. A Supabase Realtime subscription then pushes new queue
-      // rows near-instantly; a slow backstop poll covers anything missed (and
-      // works even when the realtime publication isn't enabled). This replaces
-      // the old 4s poll — far less battery, egress and wake-lock churn.
+      // Drain once now. We poll the queue as a backstop AND subscribe to Supabase
+      // Realtime for instant delivery. The poll is ADAPTIVE: a fast 3s cadence
+      // until realtime confirms it's connected, then it relaxes to 20s (saving
+      // battery/egress). If realtime never connects (e.g. publication not
+      // enabled), it stays fast so chat/alarms still arrive within a few seconds.
+      const setPoll = (ms: number) => {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(() => { if (!cancelled) void drainAndApply(); }, ms);
+      };
       await drainAndApply();
       if (cancelled) return;
-      pollTimer = setInterval(() => { if (!cancelled) void drainAndApply(); }, 20000);
+      setPoll(3000);
 
-      // Near-instant delivery: drain whenever a row is inserted for this family.
       try {
         realtimeChannel = supabase
           .channel(`sync_events:${familyId}`)
@@ -236,13 +240,12 @@ export function useFamilySync(
             () => { if (!cancelled) void drainAndApply(); },
           )
           .subscribe((status) => {
-            // On (re)subscribe, drain to catch anything inserted while we were
-            // disconnected.
-            if (status === "SUBSCRIBED" && !cancelled) void drainAndApply();
+            if (cancelled) return;
+            if (status === "SUBSCRIBED") { void drainAndApply(); setPoll(20000); } // realtime live → relax poll
+            else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") { setPoll(3000); }
           });
       } catch {
-        // Realtime unavailable (e.g. publication not enabled) — the backstop
-        // poll above still delivers everything, just a bit slower.
+        // Realtime unavailable — the fast backstop poll still delivers everything.
       }
 
       // ── OPTIONAL LIVE PATH (Trystero P2P, instant delivery) ────────────────

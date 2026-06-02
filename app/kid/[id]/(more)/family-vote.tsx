@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Image, Linking, Alert,
+  TextInput, Image, Linking, Alert, Modal,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -9,7 +9,7 @@ import { useData } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid, nowIso } from "../../../../lib/utils";
-import type { FamilyVoteTopic, FamilyDiscussionLink, FamilyVoteComment, VoteOption } from "../../../../lib/data/types";
+import type { FamilyVoteTopic, FamilyDiscussionLink, FamilyVoteComment, VoteOption, VoteTopicType } from "../../../../lib/data/types";
 import { VOTE_TOPIC_META } from "../../../../lib/data/types";
 
 function getYtId(url: string) {
@@ -41,6 +41,51 @@ export default function KidFamilyVoteScreen() {
   const [optLabel, setOptLabel] = useState("");
   const [optDesc, setOptDesc] = useState("");
   const [optImg, setOptImg] = useState<string | undefined>(undefined);
+
+  // Create-a-vote (kids can start their own votes too)
+  const [showCreate, setShowCreate] = useState(false);
+  const [cTitle, setCTitle] = useState("");
+  const [cType, setCType] = useState<VoteTopicType>("movie");
+  const [cOptText, setCOptText] = useState("");
+  const [cOptions, setCOptions] = useState<string[]>([]);
+
+  function addCreateOption() {
+    const v = cOptText.trim();
+    if (!v) return;
+    setCOptions(prev => [...prev, v]);
+    setCOptText("");
+  }
+  function createVote() {
+    if (!cTitle.trim() || cOptions.length < 2) {
+      Alert.alert("Almost there!", "Add a title and at least 2 choices.");
+      return;
+    }
+    const topic: FamilyVoteTopic = {
+      id: uid(),
+      type: cType,
+      title: cTitle.trim(),
+      emoji: VOTE_TOPIC_META[cType].emoji,
+      createdBy: id,
+      allowedVoters: ["parent", ...state.kids.map(k => k.profile.id)],
+      maxOptionsPerPerson: 3,
+      options: cOptions.map(o => ({ id: uid(), label: o, votes: [], addedBy: id })),
+      links: [], comments: [], status: "open", createdAt: nowIso(),
+    };
+    dispatch({ type: "VOTE_TOPIC_ADD", topic });
+    // Tell the rest of the family (everyone but me).
+    state.kids.filter(k => k.profile.id !== id).forEach(k => {
+      dispatch({
+        type: "NOTIFICATION_ADD", kidId: k.profile.id,
+        notification: {
+          id: uid(), kidId: k.profile.id, kind: "ping",
+          title: `${VOTE_TOPIC_META[cType].emoji} New Family Vote!`,
+          body: cTitle.trim(), emoji: VOTE_TOPIC_META[cType].emoji,
+          read: false, createdAt: nowIso(), route: "family-vote",
+        },
+      });
+    });
+    setCTitle(""); setCType("movie"); setCOptions([]); setCOptText(""); setShowCreate(false);
+  }
 
   const selectedTopic = selectedTopicId ? state.familyVoteTopics.find(t => t.id === selectedTopicId) : null;
 
@@ -276,11 +321,15 @@ export default function KidFamilyVoteScreen() {
       <Text style={s.title}>🎬 Family Vote</Text>
       <Text style={s.sub}>Vote on movies, food, trips and more!</Text>
 
+      <TouchableOpacity style={s.createBtn} onPress={() => setShowCreate(true)} activeOpacity={0.85}>
+        <Text style={s.createBtnText}>➕ Start a Vote</Text>
+      </TouchableOpacity>
+
       {topics.length === 0 ? (
         <View style={s.empty}>
           <Text style={{ fontSize: 64 }}>🗳️</Text>
           <Text style={s.emptyTitle}>No votes yet!</Text>
-          <Text style={s.emptySub}>Your parent will create a vote here. You can vote on:</Text>
+          <Text style={s.emptySub}>Tap "Start a Vote" to create one — or wait for your family. You can vote on:</Text>
           <View style={s.hintGrid}>
             {(["movie","food","vacation","weekend"] as const).map(t => {
               const m = VOTE_TOPIC_META[t];
@@ -322,13 +371,72 @@ export default function KidFamilyVoteScreen() {
           })}
         </View>
       )}
+
+      {/* Create-a-vote modal */}
+      <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)}>
+        <View style={cm.overlay}>
+          <View style={cm.sheet}>
+            <Text style={cm.title}>➕ Start a Vote</Text>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <Text style={cm.label}>What's it about?</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                {(["movie","food","vacation","weekend","holiday","custom"] as VoteTopicType[]).map(t => (
+                  <TouchableOpacity key={t} style={[cm.typeChip, cType === t && cm.typeChipOn]} onPress={() => setCType(t)}>
+                    <Text style={{ fontSize: 16 }}>{VOTE_TOPIC_META[t].emoji}</Text>
+                    <Text style={[cm.typeChipText, cType === t && { color: "#fff" }]}>{VOTE_TOPIC_META[t].label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={cm.label}>Title</Text>
+              <TextInput style={cm.input} value={cTitle} onChangeText={setCTitle} placeholder="e.g. Which movie tonight?" />
+              <Text style={cm.label}>Choices ({cOptions.length})</Text>
+              {cOptions.map((o, i) => (
+                <View key={i} style={cm.optRow}>
+                  <Text style={cm.optText}>• {o}</Text>
+                  <TouchableOpacity onPress={() => setCOptions(prev => prev.filter((_, j) => j !== i))}><Text style={{ color: Colors.error, fontWeight: "800" }}>✕</Text></TouchableOpacity>
+                </View>
+              ))}
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TextInput style={[cm.input, { flex: 1 }]} value={cOptText} onChangeText={setCOptText} placeholder="Add a choice…" onSubmitEditing={addCreateOption} returnKeyType="done" />
+                <TouchableOpacity style={cm.addBtn} onPress={addCreateOption}><Text style={cm.addBtnText}>＋</Text></TouchableOpacity>
+              </View>
+            </ScrollView>
+            <View style={cm.actions}>
+              <TouchableOpacity style={cm.cancelBtn} onPress={() => setShowCreate(false)}><Text style={cm.cancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={cm.createBtn2} onPress={createVote}><Text style={cm.createText}>🗳️ Create</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
 
+const cm = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: Colors.bgLight, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: Spacing.lg, paddingBottom: 36, maxHeight: "85%" },
+  title: { fontSize: FontSize.lg, fontWeight: "900", color: Colors.primary, textAlign: "center", marginBottom: 10 },
+  label: { fontSize: FontSize.xs, fontWeight: "800", color: Colors.textMuted, textTransform: "uppercase", marginTop: 12, marginBottom: 6 },
+  input: { borderWidth: 2, borderColor: Colors.border, borderRadius: Radius.lg, padding: Spacing.md, fontSize: FontSize.base, color: Colors.textPrimary, backgroundColor: Colors.surfaceLight },
+  typeChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.cardLight, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 8 },
+  typeChipOn: { backgroundColor: Colors.primary },
+  typeChipText: { fontSize: 13, fontWeight: "700", color: Colors.textSecondary },
+  optRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: Colors.surfaceLight, borderRadius: Radius.md, padding: 12, marginBottom: 6 },
+  optText: { fontSize: FontSize.base, color: Colors.textPrimary, fontWeight: "600" },
+  addBtn: { width: 50, borderRadius: Radius.lg, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
+  addBtnText: { color: "#fff", fontSize: 24, fontWeight: "800" },
+  actions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  cancelBtn: { flex: 1, borderWidth: 2, borderColor: Colors.border, borderRadius: Radius.full, alignItems: "center", paddingVertical: 14 },
+  cancelText: { fontWeight: "700", color: Colors.textSecondary },
+  createBtn2: { flex: 2, backgroundColor: Colors.primary, borderRadius: Radius.full, alignItems: "center", paddingVertical: 14 },
+  createText: { color: "#fff", fontWeight: "800", fontSize: FontSize.base },
+});
+
 const s = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "800", color: Colors.primary, marginBottom: 4 },
   sub: { fontSize: 13, color: Colors.textSecondary, marginBottom: 16 },
+  createBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: 14, alignItems: "center", marginBottom: 16, ...Shadow.sm },
+  createBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
   empty: { alignItems: "center", paddingTop: 30, gap: 12 },
   emptyTitle: { fontSize: 20, fontWeight: "800", color: Colors.textPrimary },
   emptySub: { fontSize: 13, color: Colors.textSecondary, textAlign: "center" },
