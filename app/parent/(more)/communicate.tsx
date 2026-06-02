@@ -14,6 +14,7 @@ import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
 import { PASTEL_COLORS } from "../../../lib/data/types";
 import { uid, nowIso } from "../../../lib/utils";
 import { uploadMedia } from "../../../lib/media-upload";
+import { useKeyboardHeight } from "../../../hooks/use-keyboard-height";
 import { createCommsTransport, type CommsTransport } from "../../../lib/comms/transport";
 import type { CallContact, CallMode, IncomingCall } from "../../../lib/data/types";
 
@@ -53,6 +54,7 @@ function ChatTab() {
   const [filter, setFilter] = useState<string>("all");
   const [peerCount, setPeerCount] = useState(0);
   const [sendingPhoto, setSendingPhoto] = useState(false);
+  const kbHeight = useKeyboardHeight();
 
   const coParents = state.coParents ?? [];
 
@@ -147,11 +149,7 @@ function ChatTab() {
   const selectedCoParent = coParents.find(cp => cp.id === filter);
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
-    >
+    <View style={{ flex: 1, paddingBottom: kbHeight }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterBar}>
         <TouchableOpacity style={[s.filterChip, filter === "all" && s.filterChipActive]} onPress={() => setFilter("all")}>
           <Text style={[s.filterText, filter === "all" && s.filterTextActive]}>👨‍👩‍👧 Everyone</Text>
@@ -235,7 +233,7 @@ function ChatTab() {
           <Text style={{ color: "#fff", fontSize: 18 }}>↑</Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

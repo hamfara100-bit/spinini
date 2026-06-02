@@ -12,6 +12,7 @@ import { useData, useKid } from "../../../../lib/data/store";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid, nowIso } from "../../../../lib/utils";
 import { uploadMedia } from "../../../../lib/media-upload";
+import { useKeyboardHeight } from "../../../../hooks/use-keyboard-height";
 import { createCommsTransport, type CommsTransport } from "../../../../lib/comms/transport";
 import type { CallContact, MascotType } from "../../../../lib/data/types";
 
@@ -373,6 +374,7 @@ function KidChatTab({ kidId }: { kidId: string }) {
   const [text, setText] = useState("");
   const [peerCount, setPeerCount] = useState(0);
   const [sendingPhoto, setSendingPhoto] = useState(false);
+  const kbHeight = useKeyboardHeight();
 
   const authorId   = kidId;
   const authorName = kid?.profile.name ?? "Me";
@@ -450,11 +452,7 @@ function KidChatTab({ kidId }: { kidId: string }) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
-    >
+    <View style={{ flex: 1, paddingBottom: kbHeight }}>
       {peerCount > 1 && (
         <View style={s.liveBanner}>
           <Text style={s.liveBannerText}>🟢 Live — {peerCount - 1} other {peerCount - 1 === 1 ? "device" : "devices"} connected</Text>
@@ -499,7 +497,7 @@ function KidChatTab({ kidId }: { kidId: string }) {
           <Text style={{ color: "#fff", fontSize: 18 }}>↑</Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
