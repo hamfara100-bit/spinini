@@ -8,6 +8,7 @@ import { Colors } from "../../../lib/theme";
 import { AlarmOverlay } from "../../../components/alarm-overlay";
 import { LockdownOverlay } from "../../../components/lockdown-overlay";
 import { useData } from "../../../lib/data/store";
+import { notificationFeature } from "../../../lib/data/badges";
 
 /**
  * Fires a system notification + sound + vibration when a NEW parent ping (or
@@ -30,9 +31,14 @@ function KidPingNotifier({ kidId }: { kidId: string }) {
     for (const n of notifs) {
       if (seen.current.has(n.id)) continue;
       seen.current.add(n.id);
+      // Tapping opens the feature this notification is about: its explicit route,
+      // else the feature mapped from its kind, else the kid's home.
+      const feat = notificationFeature(n);
+      const seg = n.route ? n.route.replace(/^\//, "") : feat;
+      const route = seg ? `/kid/${kidId}/(more)/${seg}` : `/kid/${kidId}/home`;
       Vibration.vibrate([0, 300, 150, 300]);
       Notifications.scheduleNotificationAsync({
-        content: { title: `${n.emoji ?? "🔔"} ${n.title}`, body: n.body || "", sound: true },
+        content: { title: `${n.emoji ?? "🔔"} ${n.title}`, body: n.body || "", sound: true, data: { route } },
         trigger: null,
       }).catch(() => {});
     }

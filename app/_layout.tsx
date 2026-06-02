@@ -2,7 +2,7 @@
 // getRandomValues and the WebRTC globals exist before any comms code runs.
 import "../lib/comms/trystero-polyfills";
 import React, { useState, useEffect, useRef } from "react";
-import { Stack, usePathname } from "expo-router";
+import { Stack, usePathname, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, Linking, AppState as RNAppState, Platform, Vibration } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -173,9 +173,12 @@ function ChatNotifier() {
       seen.current.add(m.id);
       if (myIdRef.current && m.authorId === myIdRef.current) continue; // my own message
       if (onChatRef.current) continue;                                  // already viewing chat
+      const chatRoute = myIdRef.current === "__parent__"
+        ? "/parent/(more)/communicate"
+        : `/kid/${myIdRef.current}/(more)/communicate`;
       Vibration.vibrate([0, 350, 180, 350]);
       Notifications.scheduleNotificationAsync({
-        content: { title: `💬 ${m.authorName}`, body: m.text || "New message", sound: true },
+        content: { title: `💬 ${m.authorName}`, body: m.text || "New message", sound: true, data: { route: chatRoute } },
         trigger: null,
       }).catch(() => {});
     }
@@ -223,6 +226,7 @@ function SocialNotifier() {
       return;
     }
     const me = myIdRef.current;
+    const socialRoute = me === "parent" ? "/parent/(more)/social" : me ? `/kid/${me}/(more)/social` : undefined;
     for (const p of posts) {
       // New post by someone else
       if (!seenPosts.current.has(p.id)) {
@@ -230,7 +234,7 @@ function SocialNotifier() {
         if (me && p.authorId !== me && !onSocialRef.current) {
           Vibration.vibrate([0, 250, 120, 250]);
           Notifications.scheduleNotificationAsync({
-            content: { title: `📱 ${nameOf(p.authorId)} posted`, body: p.caption || "New family post", sound: true },
+            content: { title: `📱 ${nameOf(p.authorId)} posted`, body: p.caption || "New family post", sound: true, data: { route: socialRoute } },
             trigger: null,
           }).catch(() => {});
         }
@@ -244,7 +248,7 @@ function SocialNotifier() {
         if (mine && liker !== me) {
           Vibration.vibrate([0, 250]);
           Notifications.scheduleNotificationAsync({
-            content: { title: `❤️ ${nameOf(liker)} liked your post`, body: p.caption || "Family Social", sound: true },
+            content: { title: `❤️ ${nameOf(liker)} liked your post`, body: p.caption || "Family Social", sound: true, data: { route: socialRoute } },
             trigger: null,
           }).catch(() => {});
         }
@@ -255,7 +259,7 @@ function SocialNotifier() {
         if (mine && c.authorId !== me) {
           Vibration.vibrate([0, 250, 120, 250]);
           Notifications.scheduleNotificationAsync({
-            content: { title: `💬 ${nameOf(c.authorId)} commented`, body: c.text || "New comment", sound: true },
+            content: { title: `💬 ${nameOf(c.authorId)} commented`, body: c.text || "New comment", sound: true, data: { route: socialRoute } },
             trigger: null,
           }).catch(() => {});
         }
@@ -263,6 +267,28 @@ function SocialNotifier() {
     }
   }, [state.familySocialPosts]);
 
+  return null;
+}
+
+/**
+ * Tapping a notification opens the screen it belongs to. Every notification we
+ * post carries `data.route` (e.g. the chat or social page); this listener reads
+ * it and navigates. Also handles the cold-start case where tapping a
+ * notification launched the app.
+ */
+function NotificationRouter() {
+  useEffect(() => {
+    function go(resp: Notifications.NotificationResponse | null) {
+      const route = (resp?.notification?.request?.content?.data as any)?.route;
+      if (route && typeof route === "string") {
+        // Small delay so the navigation tree is mounted on cold start.
+        setTimeout(() => { try { router.push(route as any); } catch {} }, 300);
+      }
+    }
+    const sub = Notifications.addNotificationResponseReceivedListener(go);
+    Notifications.getLastNotificationResponseAsync().then(go).catch(() => {});
+    return () => sub.remove();
+  }, []);
   return null;
 }
 
@@ -324,6 +350,7 @@ function ScreenTimeLimitNotifier() {
               title: "⏰ Screen time limit reached",
               body: `${kid.profile.name} has used their full screen time for today.`,
               sound: true,
+              data: { route: `/parent/(more)/kid/${kid.profile.id}` },
             },
             trigger: null,
           }).catch(() => {});
@@ -442,6 +469,7 @@ export default function RootLayout() {
                 <SchedulerBridge />
                 <ChatNotifier />
                 <SocialNotifier />
+                <NotificationRouter />
                 <DeepLinkHandler />
                 <ScreenTimeLimitNotifier />
                 <OfflineBanner />

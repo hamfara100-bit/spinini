@@ -49,10 +49,10 @@ async function pushEvent(event: object) {
   } catch {}
 }
 
-async function notify(title: string, body: string) {
+async function notify(title: string, body: string, route = "/parent/dashboard") {
   try {
     await Notifications.scheduleNotificationAsync({
-      content: { title, body, sound: true },
+      content: { title, body, sound: true, data: { route } },
       trigger: null,
     });
   } catch {}
