@@ -21,6 +21,7 @@ import { MicButton } from "./voice-text-input";
 import { MemeStickerPicker, StickerDisplay, decodeStickerUri } from "./meme-sticker-picker";
 import { Colors, FontSize, Radius } from "../lib/theme";
 import { uid, nowIso } from "../lib/utils";
+import { uploadMediaMany } from "../lib/media-upload";
 import type { FamilySocialPost, FamilySocialComment } from "../lib/data/types";
 import { useData } from "../lib/data/store";
 
@@ -370,8 +371,9 @@ export function CreatePostModal({
   const [caption, setCaption] = useState("");
   const [textColor, setTextColor] = useState("#FFFFFF");
   const [showFunPicker, setShowFunPicker] = useState(false);
+  const [posting, setPosting] = useState(false);
 
-  function reset() { setStep("pick"); setMediaUris([]); setCaption(""); setMediaType("photo"); setShowFunPicker(false); }
+  function reset() { setStep("pick"); setMediaUris([]); setCaption(""); setMediaType("photo"); setShowFunPicker(false); setPosting(false); }
   function handleClose() { reset(); onClose(); }
 
   function handleFunSelect(uri: string, type: "meme" | "gif" | "sticker") {
@@ -408,15 +410,29 @@ export function CreatePostModal({
 
   function textPost() { setMediaType("text"); setStep("caption"); }
 
-  function post() {
+  async function post() {
+    if (posting) return;
     if (mediaType !== "text" && mediaUris.length === 0) return;
     if (mediaType === "text" && !caption.trim()) return;
+
+    // Photos/videos live at a local file:// URI — upload them to storage so the
+    // media shows on every family device, not just the one that posted it.
+    // (Stickers/memes/gifs are deterministic encoded URIs and don't need it.)
+    let finalUris = mediaUris;
+    if (mediaType === "photo" || mediaType === "multi_photo" || mediaType === "video") {
+      setPosting(true);
+      try {
+        finalUris = await uploadMediaMany(mediaUris, { folder: "social" });
+      } finally {
+        setPosting(false);
+      }
+    }
 
     const p: FamilySocialPost = {
       id: uid(),
       authorId,
       type: mediaType,
-      mediaUris,
+      mediaUris: finalUris,
       caption: caption.trim(),
       likes: [],
       comments: [],
@@ -460,7 +476,7 @@ export function CreatePostModal({
             {step === "pick" ? "📱 New Post" : step === "caption" ? "✏️ Add Caption" : "Preview"}
           </Text>
           {step === "caption"
-            ? <TouchableOpacity onPress={post} style={[cp.postBtn, (mediaType !== "text" && mediaUris.length === 0) && { opacity: 0.4 }]}><Text style={cp.postBtnText}>Post 🚀</Text></TouchableOpacity>
+            ? <TouchableOpacity disabled={posting} onPress={post} style={[cp.postBtn, ((mediaType !== "text" && mediaUris.length === 0) || posting) && { opacity: 0.4 }]}><Text style={cp.postBtnText}>{posting ? "Posting…" : "Post 🚀"}</Text></TouchableOpacity>
             : <View style={{ width: 70 }} />
           }
         </View>
