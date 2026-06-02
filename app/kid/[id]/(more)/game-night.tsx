@@ -25,7 +25,7 @@ const TTT_CELL = Math.floor(BOARD / 3);                 // tic-tac-toe 3×3
 const C4_CELL  = Math.floor((BOARD - 12) / 7);          // connect-4 7 cols (pad 6 each side)
 const MEM_CELL = Math.floor((BOARD - 30) / 4);          // memory 4 per row (3 gaps)
 const GRID8    = Math.floor(BOARD / 8);                  // checkers / chess 8×8
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useData, useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
@@ -855,6 +855,14 @@ export default function GameNightScreen({ id: idProp }: { id?: string } = {}) {
   const id = idProp ?? params.id;
   const kid = useKid(id);
   const { state, dispatch } = useData();
+  const router = useRouter();
+
+  function openOnline() {
+    const isParent = state.deviceRole === "parent";
+    const meId = isParent ? "parent" : id;
+    const meName = isParent ? (state.parentSettings.name || "Parent") : (kid?.profile.name ?? "Me");
+    router.push(`/online-game?me=${encodeURIComponent(meId)}&name=${encodeURIComponent(meName)}` as any);
+  }
 
   const roster: Player[] = useMemo(() => {
     const kids = state.kids.map(k => ({
@@ -960,6 +968,18 @@ export default function GameNightScreen({ id: idProp }: { id?: string } = {}) {
     <ScreenContainer scroll>
       <Text style={ls.title}>🎮 Game Night</Text>
       <Text style={ls.sub}>Play together! Send an alarm to call the family over, pick a game, and the winner earns reward points.</Text>
+
+      {/* Online (different devices) */}
+      <TouchableOpacity style={ls.onlineBtn} onPress={openOnline} activeOpacity={0.85}>
+        <Text style={ls.onlineEmoji}>🌐</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={ls.onlineTitle}>Play Online — different phones</Text>
+          <Text style={ls.onlineSub}>Start a match; family joins from their own device</Text>
+        </View>
+        <Text style={ls.onlineArrow}>›</Text>
+      </TouchableOpacity>
+
+      <Text style={ls.sectionLabel}>Or play on THIS device (pass & play)</Text>
 
       {/* Game picker */}
       <Text style={ls.sectionLabel}>1. Pick a Game</Text>
@@ -1067,6 +1087,11 @@ export default function GameNightScreen({ id: idProp }: { id?: string } = {}) {
 const ls = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "900", color: Colors.textPrimary, marginBottom: 4 },
   sub: { fontSize: 13, color: Colors.textSecondary, lineHeight: 19, marginBottom: 16 },
+  onlineBtn: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: Colors.primary, borderRadius: 18, padding: 16, marginBottom: 16, ...Shadow.md },
+  onlineEmoji: { fontSize: 34 },
+  onlineTitle: { fontSize: 16, fontWeight: "900", color: "#fff" },
+  onlineSub: { fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2 },
+  onlineArrow: { fontSize: 28, color: "rgba(255,255,255,0.7)", fontWeight: "300" },
   sectionLabel: { fontSize: 13, fontWeight: "800", color: Colors.primary, marginTop: 14, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
   needTxt: { fontSize: 11, fontWeight: "700", color: Colors.textMuted, textTransform: "none" },
 

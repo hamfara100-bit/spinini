@@ -35,11 +35,15 @@ function KidPingNotifier({ kidId }: { kidId: string }) {
       // else the feature mapped from its kind, else the kid's home.
       const feat = notificationFeature(n);
       const seg = n.route ? n.route.replace(/^\//, "") : feat;
-      // "communicate" lives on the Call & Chat tab; everything else under (more).
+      const kidName = kid?.profile.name ?? "Me";
+      // "communicate" → Call & Chat tab; "online-game" → the full-screen
+      // top-level match; everything else under (more).
       const route = !seg
         ? `/kid/${kidId}/home`
         : seg === "communicate"
         ? `/kid/${kidId}/callchat`
+        : seg === "online-game"
+        ? `/online-game?me=${encodeURIComponent(kidId)}&name=${encodeURIComponent(kidName)}`
         : `/kid/${kidId}/(more)/${seg}`;
       Vibration.vibrate([0, 300, 150, 300]);
       Notifications.scheduleNotificationAsync({

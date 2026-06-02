@@ -2019,6 +2019,33 @@ export interface AppState {
    *  Set once on first launch and never changed — the device is locked into
    *  one role. Null means the role chooser hasn't been shown yet. */
   deviceRole: "parent" | "kid" | null;
+
+  /** Active cross-device (online) Game Night match. Synced to all family
+   *  devices so two people on DIFFERENT phones can play the same board. */
+  onlineGame?: OnlineGameSession | null;
+}
+
+// ─── Online (cross-device) Game Night ────────────────────────────────────────
+export type OnlineGameId = "ttt" | "connect4";
+
+export interface OnlineGamePlayer {
+  id: string;          // "parent" or a kid profile id
+  name: string;
+  seat: 0 | 1;         // seat 0 = host, seat 1 = guest
+}
+
+export interface OnlineGameSession {
+  id: string;
+  gameId: OnlineGameId;
+  status: "waiting" | "playing" | "finished";
+  hostId: string;
+  players: OnlineGamePlayer[];     // 1 while waiting, 2 once joined
+  board: any;                      // TTTBoard (9) | C4Board (6x7) — serialized
+  turn: 0 | 1;                     // seat whose turn it is
+  winner: 0 | 1 | "draw" | null;
+  reward: number;                  // ⭐ for the winning kid
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Feature 15: Family Tech Agreement ───────────────────────────────────────
@@ -2127,6 +2154,13 @@ export interface FamilyBook {
 
 // ─── Action Types ────────────────────────────────────────────────────────────
 export type AppAction =
+  // Online Game Night (cross-device)
+  | { type: "OGAME_CREATE"; session: OnlineGameSession }
+  | { type: "OGAME_JOIN"; playerId: string; playerName: string }
+  | { type: "OGAME_START" }
+  | { type: "OGAME_MOVE"; seat: 0 | 1; index: number }   // index = cell (TTT) or column (C4)
+  | { type: "OGAME_RESET" }
+  | { type: "OGAME_END" }
   // Setup
   | { type: "SETUP_COMPLETE" }
   | { type: "SET_DEVICE_ROLE"; role: "parent" | "kid" }

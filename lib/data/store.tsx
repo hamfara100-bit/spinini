@@ -5,6 +5,7 @@ import { uid } from "../utils";
 import { saveRecoveryCode } from "../secure-tokens";
 import { useFamilySync } from "./sync-bridge";
 import { notificationFeature } from "./badges";
+import { tttEmpty, tttWinner, tttFull, tttMarkForSeat, c4Empty, c4Drop, c4Winner, c4Full } from "../games/engine";
 import {
   AppState, AppAction, KidState, KidProfile, KidRules,
   MoneyState, BehaviorScoreState, PermissionLedger, FamilyFilterStatus, CloudBackupConfig,
@@ -301,6 +302,7 @@ export const initialState: AppState = {
   },
   setupDone: false,
   deviceRole: null,
+  onlineGame: null,
   incomingCalls: [],
   parentNotes: [],
   parentTodos: [],
@@ -327,8 +329,81 @@ function updateKid(state: AppState, kidId: string, updater: (k: KidState) => Kid
   return { ...state, kids: state.kids.map(k => k.profile.id === kidId ? updater(k) : k) };
 }
 
+// ── Online Game Night helpers ────────────────────────────────────────────────
+function ogInitBoard(gameId: "ttt" | "connect4"): any {
+  return gameId === "ttt" ? tttEmpty() : c4Empty();
+}
+function ogApplyMove(session: any): (seat: 0 | 1, index: number) => any {
+  return (seat, index) => {
+    if (session.gameId === "ttt") {
+      const board = (session.board as any[]).slice();
+      if (board[index] != null) return null;            // occupied
+      board[index] = tttMarkForSeat(seat);
+      const win = tttWinner(board);
+      const winner = win ? seat : (tttFull(board) ? "draw" : null);
+      return { board, winner };
+    } else {
+      const dropped = c4Drop(session.board, index, seat);
+      if (!dropped) return null;                          // column full
+      const win = c4Winner(dropped.board);
+      const winner = win ? seat : (c4Full(dropped.board) ? "draw" : null);
+      return { board: dropped.board, winner };
+    }
+  };
+}
+
 function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+    // ── Online (cross-device) Game Night ─────────────────────────────────────
+    case "OGAME_CREATE":
+      return { ...state, onlineGame: action.session };
+    case "OGAME_JOIN": {
+      const g = state.onlineGame;
+      if (!g || g.status !== "waiting") return state;
+      if (g.players.some(p => p.id === action.playerId)) return state; // already in
+      if (g.players.length >= 2) return state;
+      return {
+        ...state,
+        onlineGame: {
+          ...g,
+          players: [...g.players, { id: action.playerId, name: action.playerName, seat: 1 }],
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }
+    case "OGAME_START": {
+      const g = state.onlineGame;
+      if (!g || g.players.length < 2) return state;
+      return { ...state, onlineGame: { ...g, status: "playing", turn: 0, updatedAt: new Date().toISOString() } };
+    }
+    case "OGAME_MOVE": {
+      const g = state.onlineGame;
+      if (!g || g.status !== "playing" || g.turn !== action.seat) return state;
+      const res = ogApplyMove(g)(action.seat, action.index);
+      if (!res) return state; // illegal move
+      return {
+        ...state,
+        onlineGame: {
+          ...g,
+          board: res.board,
+          winner: res.winner,
+          status: res.winner != null ? "finished" : "playing",
+          turn: res.winner != null ? g.turn : (g.turn === 0 ? 1 : 0),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }
+    case "OGAME_RESET": {
+      const g = state.onlineGame;
+      if (!g) return state;
+      return {
+        ...state,
+        onlineGame: { ...g, board: ogInitBoard(g.gameId), winner: null, status: "playing", turn: 0, updatedAt: new Date().toISOString() },
+      };
+    }
+    case "OGAME_END":
+      return { ...state, onlineGame: null };
+
     case "SETUP_COMPLETE":
       return { ...state, setupDone: true };
     case "SET_DEVICE_ROLE":
