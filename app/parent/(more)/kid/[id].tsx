@@ -14,6 +14,7 @@ import { getTodayUsage, getRemainingMinutes, getBankBalance, formatMinutes, getS
 import { DurationPicker, DurationMinutes, tomorrowMidnight, minutesUntilMidnight } from "../../../../components/duration-picker";
 import type { AgePreset, VoiceNote } from "../../../../lib/data/types";
 import { uid, nowIso } from "../../../../lib/utils";
+import { uploadMedia } from "../../../../lib/media-upload";
 
 type Tab = "overview" | "controls" | "voice" | "chores";
 
@@ -113,10 +114,12 @@ function VoiceTab({ kidId, kidName, parentName }: { kidId: string; kidName: stri
       await recorder.stop();
       const uri = recorder.uri;
       if (!uri) { Alert.alert("Error", "Recording failed — no file was saved."); setSaving(false); return; }
+      // Upload so the kid's device can actually play it (needs the storage bucket).
+      const sharedUri = (await uploadMedia(uri, { folder: "voice-notes" })) ?? uri;
       const note: VoiceNote = {
         id: uid(),
         title: title.trim() || `Voice message from ${parentName}`,
-        uri,
+        uri: sharedUri,
         durationSecs: recSecs,
         createdAt: nowIso(),
         from: parentName,

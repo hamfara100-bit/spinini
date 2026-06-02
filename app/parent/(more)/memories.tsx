@@ -8,6 +8,7 @@ import { useData } from "../../../lib/data/store";
 import { ScreenContainer } from "../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
 import { uid, nowIso } from "../../../lib/utils";
+import { uploadMediaMany } from "../../../lib/media-upload";
 import { Memory, MemoryMood } from "../../../lib/data/types";
 
 const W = Dimensions.get("window").width;
@@ -74,17 +75,19 @@ export default function ParentMemoriesScreen() {
     setSelYear(t[0]); setSelMonth(t[1]); setSelDay(t[2]);
   }
 
-  function saveMemory() {
+  async function saveMemory() {
     if (!formStory.trim() && formPhotos.length === 0) {
       Alert.alert("Add Content", "Please write a story or add at least one photo.");
       return;
     }
+    // Upload photos so they show on every family device (not just this one).
+    const photoUris = await uploadMediaMany(formPhotos, { folder: "memories" });
     const memory: Memory = {
       id: uid(),
       title: formTitle.trim() || `${MOOD_LABEL[formMood]} Memory`,
       date: formDate,
       story: formStory.trim(),
-      photoUris: formPhotos,
+      photoUris,
       mood: formMood,
       forKids: formForKids,
       addedBy: state.parent.name,

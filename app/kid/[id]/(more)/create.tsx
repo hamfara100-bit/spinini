@@ -12,6 +12,7 @@ import { useData, useKid } from "../../../../lib/data/store";
 import { DrawingCanvas } from "../../../../components/drawing-canvas";
 import { Colors, FontSize, Radius, Spacing, Shadow } from "../../../../lib/theme";
 import { uid, nowIso } from "../../../../lib/utils";
+import { uploadMedia, uploadMediaMany } from "../../../../lib/media-upload";
 import { StopMotionStudio } from "../../../../components/stop-motion-studio";
 import { generateColoringSVG } from "../../../../lib/ai";
 import type { DrawingPath, DrawingSticker, ColoringPage } from "../../../../lib/data/types";
@@ -224,19 +225,21 @@ export default function CreateScreen() {
     if (!pendingSave) return;
     const { paths, stickers, imageUri } = pendingSave;
     const title = name.trim() || `Drawing ${new Date().toLocaleDateString()}`;
+    // Upload the rendered image so it shows on the parent's device too.
+    const sharedImage = imageUri ? (await uploadMedia(imageUri, { folder: "drawings" })) ?? imageUri : imageUri;
 
     if (editingDrawing && editingDrawing.id !== "__draft__") {
       dispatch({
         type: "UPDATE_DRAWING",
         kidId: id,
         drawingId: editingDrawing.id,
-        payload: { paths, stickers, imageUri, title },
+        payload: { paths, stickers, imageUri: sharedImage, title },
       });
     } else {
       dispatch({
         type: "ADD_DRAWING",
         kidId: id,
-        drawing: { id: uid(), kidId: id, paths, stickers, imageUri, title, createdAt: nowIso() },
+        drawing: { id: uid(), kidId: id, paths, stickers, imageUri: sharedImage, title, createdAt: nowIso() },
       });
     }
     // Clear the draft since it's been properly saved
@@ -829,9 +832,10 @@ function ColoringTab({ kidId, pages, dispatch }: { kidId: string; pages: Colorin
     }
   }
 
-  function savePaths(paths: DrawingPath[], stickers: any[], _imageUri: string) {
+  async function savePaths(paths: DrawingPath[], stickers: any[], _imageUri: string) {
     if (!activePage) return;
-    dispatch({ type: "COLORING_UPDATE", kidId, pageId: activePage.id, payload: { paths, stickers, coloredUri: _imageUri } });
+    const coloredUri = _imageUri ? (await uploadMedia(_imageUri, { folder: "coloring" })) ?? _imageUri : _imageUri;
+    dispatch({ type: "COLORING_UPDATE", kidId, pageId: activePage.id, payload: { paths, stickers, coloredUri } });
     setActivePage(null);
   }
 

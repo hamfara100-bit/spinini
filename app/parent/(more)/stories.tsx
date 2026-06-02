@@ -24,6 +24,7 @@ import { useData } from "../../../lib/data/store";
 import { ScreenContainer } from "../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
 import { uid, nowIso } from "../../../lib/utils";
+import { uploadMedia } from "../../../lib/media-upload";
 import { claudeGenerateStory } from "../../../lib/ai";
 import type { StoryItem, StoryMedia, StoryMediaKind, VoiceSample, StoryRecordingType } from "../../../lib/data/types";
 
@@ -388,7 +389,7 @@ function CreateStoryModal({
   }
 
   // ── Save ──
-  function save() {
+  async function save() {
     const t = title.trim();
     if (!t) { Alert.alert("Give the story a title first."); return; }
 
@@ -401,13 +402,16 @@ function CreateStoryModal({
       Alert.alert("Add a voice sample first so the AI knows what you sound like."); return;
     }
 
+    // Upload recordings so the kids' devices can play them (needs the bucket).
+    const sharedAudio = audioUri ? (await uploadMedia(audioUri, { folder: "stories" })) ?? audioUri : undefined;
+    const sharedVideo = videoUri ? (await uploadMedia(videoUri, { folder: "stories" })) ?? videoUri : undefined;
     const story: StoryItem = {
       id: uid(),
       title: t,
       text: generatedText.trim() || (mode === "voice-audio" ? "(Voice recording — tap to listen)" : "(Video story — tap to watch)"),
       recordingType: mode,
-      audioUri: audioUri ?? undefined,
-      videoUri: videoUri ?? undefined,
+      audioUri: sharedAudio,
+      videoUri: sharedVideo,
       coverEmoji,
       duration: mode === "voice-audio" ? recSec : undefined,
       authorId: "parent",

@@ -10,6 +10,7 @@ import { useData, useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid, nowIso } from "../../../../lib/utils";
+import { uploadMedia } from "../../../../lib/media-upload";
 import { Achievement, AchievementCategory } from "../../../../lib/data/types";
 
 const CATEGORIES: { id: AchievementCategory; emoji: string; label: string; color: string }[] = [
@@ -58,14 +59,15 @@ export default function AchievementsScreen() {
     ]);
   }
 
-  function submit() {
+  async function submit() {
     if (!title.trim()) { Alert.alert("Give your achievement a title!"); return; }
+    const sharedPhoto = photoUri ? (await uploadMedia(photoUri, { folder: "achievements" })) ?? photoUri : undefined;
     const achievement: Achievement = {
       id: uid(),
       kidId: id,
       title: title.trim(),
       note: note.trim() || undefined,
-      photoUri: photoUri ?? undefined,
+      photoUri: sharedPhoto,
       category,
       createdAt: nowIso(),
     };

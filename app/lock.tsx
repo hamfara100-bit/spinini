@@ -29,6 +29,13 @@ export default function LockScreen() {
   if (!id) return null;
 
   async function handleBackPin(pin: string) {
+    // If the parent never set a PIN there's nothing to verify — allow exit so the
+    // kid isn't trapped on the lock screen.
+    if (!state.parentSettings.pin) {
+      setShowPinGate(false);
+      router.replace("/");
+      return;
+    }
     const hashed = await hashPin(pin);
     if (hashed === state.parentSettings.pin) {
       setShowPinGate(false);

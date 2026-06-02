@@ -12,6 +12,7 @@ import { useData, useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid, nowIso, formatDate } from "../../../../lib/utils";
+import { uploadMedia } from "../../../../lib/media-upload";
 import type { JournalEntry } from "../../../../lib/data/types";
 
 const MOODS = ["😊", "😢", "😡", "😴", "🤩", "😌", "🤔", "🥳"];
@@ -90,9 +91,11 @@ export default function JournalScreen() {
     setMediaUri(null); setMediaType(null);
   }
 
-  function save() {
+  async function save() {
     if (!text.trim() && !mediaUri) { Alert.alert("Write something or add a photo!"); return; }
     const now = nowIso();
+    // Upload media so it shows on the parent's device too.
+    const sharedMedia = mediaUri ? (await uploadMedia(mediaUri, { folder: "journal" })) ?? mediaUri : undefined;
     if (editingEntry) {
       dispatch({
         type: "EDIT_JOURNAL",
@@ -101,7 +104,7 @@ export default function JournalScreen() {
           ...editingEntry,
           text: text.trim(),
           mood: mood ?? undefined,
-          photoUri: mediaUri ?? undefined,
+          photoUri: sharedMedia,
           mediaType: mediaType ?? undefined,
           updatedAt: now,
         },
@@ -115,7 +118,7 @@ export default function JournalScreen() {
           kidId: id,
           text: text.trim(),
           mood: mood ?? undefined,
-          photoUri: mediaUri ?? undefined,
+          photoUri: sharedMedia,
           mediaType: mediaType ?? undefined,
           createdAt: now,
         },

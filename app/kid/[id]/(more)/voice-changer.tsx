@@ -9,6 +9,7 @@ import { useData, useKid } from "../../../../lib/data/store";
 import { ScreenContainer } from "../../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid, nowIso } from "../../../../lib/utils";
+import { uploadMedia } from "../../../../lib/media-upload";
 import type { FamilyMessage, SavedVoiceRecording } from "../../../../lib/data/types";
 
 // ─── Sound Effects ────────────────────────────────────────────────────────────
@@ -184,10 +185,12 @@ export default function VoiceChangerScreen() {
     if (!rec.uri) { setShareTarget(null); return; }
     setSending(true);
     try {
+      // Upload the audio so it plays on other devices (needs the storage bucket).
+      const sharedUri = (await uploadMedia(rec.uri, { folder: "voice-chat" })) ?? rec.uri;
       const message: FamilyMessage = {
         id: uid(),
         text: `🎙️ Voice message with ${rec.fxEmoji} ${rec.fxLabel} effect${sendNote.trim() ? `\n"${sendNote.trim()}"` : ""}`,
-        imageUri: rec.uri,        // repurposed to carry the audio URI locally
+        imageUri: sharedUri,      // repurposed to carry the audio URI
         authorId: id,
         authorName: kid?.profile.name ?? "Kid",
         recipients: [],           // broadcast to whole family

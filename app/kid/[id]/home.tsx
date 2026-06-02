@@ -18,6 +18,7 @@ import { AnimatedFeatureCard, FeatureDef } from "../../../components/animated-fe
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
 import { PASTEL_COLORS, FEATURE_LABELS } from "../../../lib/data/types";
 import { socialBadgeCount, chatUnreadCount, kidNotificationBadges } from "../../../lib/data/badges";
+import { uploadMedia } from "../../../lib/media-upload";
 import type { FunnySoundMessage, SosAlert, VoiceNote } from "../../../lib/data/types";
 import { getRemainingMinutes, getUsagePct, getBankBalance, isLocked, isInBedtimeSoftLock, formatMinutes } from "../../../lib/data/logic";
 import { FUNNY_PRESETS } from "../../../lib/funny-sounds";
@@ -520,8 +521,10 @@ export default function KidHome() {
         await ambientRecorder.stop();
         const uri2 = ambientRecorder.uri;
         if (uri2) {
+          // Upload so the parent's device can play it (needs the storage bucket).
+          const sharedUri = (await uploadMedia(uri2, { folder: "ambient" })) ?? uri2;
           dispatch({ type: "AMBIENT_RECORDING_ADD", kidId: id, recording: {
-            id: uid(), uri: uri2, durationSecs: secs,
+            id: uid(), uri: sharedUri, durationSecs: secs,
             requestedAt: req.requestedAt, recordedAt: nowIso(),
           }});
         }
