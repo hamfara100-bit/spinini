@@ -178,7 +178,7 @@ function ChatNotifier() {
         : `/kid/${myIdRef.current}/(more)/communicate`;
       Vibration.vibrate([0, 350, 180, 350]);
       Notifications.scheduleNotificationAsync({
-        content: { title: `💬 ${m.authorName}`, body: m.text || "New message", sound: true, data: { route: chatRoute } },
+        content: { title: `💬 ${m.authorName}`, body: m.text || (m.imageUri ? "📷 Photo" : m.audioUri ? "🎙️ Voice message" : "New message"), sound: true, data: { route: chatRoute } },
         trigger: null,
       }).catch(() => {});
     }

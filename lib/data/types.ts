@@ -546,7 +546,8 @@ export interface Memory {
 export interface FamilyMessage {
   id: string;
   text?: string;
-  imageUri?: string;
+  imageUri?: string;   // a shared photo
+  audioUri?: string;   // a shared voice/audio clip
   authorId: string;
   authorName: string;
   recipients: string[];

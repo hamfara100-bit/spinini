@@ -5,10 +5,13 @@ import {
   KeyboardAvoidingView, Platform,
 } from "react-native";
 import * as Notifications from "expo-notifications";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "expo-image";
 import { useLocalSearchParams, useGlobalSearchParams } from "expo-router";
 import { useData, useKid } from "../../../../lib/data/store";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../../lib/theme";
 import { uid, nowIso } from "../../../../lib/utils";
+import { uploadMedia } from "../../../../lib/media-upload";
 import { createCommsTransport, type CommsTransport } from "../../../../lib/comms/transport";
 import type { CallContact, MascotType } from "../../../../lib/data/types";
 
@@ -369,6 +372,7 @@ function KidChatTab({ kidId }: { kidId: string }) {
   const kid = useKid(kidId);
   const [text, setText] = useState("");
   const [peerCount, setPeerCount] = useState(0);
+  const [sendingPhoto, setSendingPhoto] = useState(false);
 
   const authorId   = kidId;
   const authorName = kid?.profile.name ?? "Me";
@@ -398,7 +402,8 @@ function KidChatTab({ kidId }: { kidId: string }) {
       dispatch({
         type: "FAMILY_CHAT_PUSH",
         message: {
-          id: m.id, text: m.text, authorId: m.authorId, authorName: m.authorName,
+          id: m.id, text: m.text, imageUri: (m as any).imageUri, audioUri: (m as any).audioUri,
+          authorId: m.authorId, authorName: m.authorName,
           recipients: m.recipients ?? [], sentAt: m.sentAt, readBy: [m.authorId],
         },
       });
@@ -419,6 +424,29 @@ function KidChatTab({ kidId }: { kidId: string }) {
     });
     transportRef.current?.send({ id, text: text.trim(), authorId, authorName, sentAt, recipients: [] });
     setText("");
+  }
+
+  async function sendPhoto() {
+    if (sendingPhoto) return;
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) { Alert.alert("Allow photos", "Photo access is needed to send a picture."); return; }
+      const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
+      if (r.canceled || !r.assets?.[0]) return;
+      setSendingPhoto(true);
+      const shared = (await uploadMedia(r.assets[0].uri, { folder: "chat" })) ?? r.assets[0].uri;
+      const id = uid();
+      const sentAt = nowIso();
+      seenIds.current.add(id);
+      const msg = { id, text: text.trim(), imageUri: shared, authorId, authorName, recipients: [] as string[], sentAt };
+      dispatch({ type: "FAMILY_CHAT_PUSH", message: { ...msg, readBy: [authorId] } });
+      transportRef.current?.send(msg as any);
+      setText("");
+    } catch {
+      Alert.alert("Couldn't send", "The photo could not be sent. Try again.");
+    } finally {
+      setSendingPhoto(false);
+    }
   }
 
   return (
@@ -445,13 +473,19 @@ function KidChatTab({ kidId }: { kidId: string }) {
           return (
             <View style={[s.chatBubble, isMe ? s.chatBubbleMe : s.chatBubbleThem]}>
               {!isMe && <Text style={s.chatAuthor}>{item.authorName}</Text>}
-              <Text style={[s.chatMsg, isMe ? s.chatMsgMe : s.chatMsgThem]}>{item.text}</Text>
+              {item.imageUri ? (
+                <Image source={{ uri: item.imageUri }} style={s.chatImage} contentFit="cover" />
+              ) : null}
+              {item.text ? <Text style={[s.chatMsg, isMe ? s.chatMsgMe : s.chatMsgThem]}>{item.text}</Text> : null}
               <Text style={s.chatTime}>{item.sentAt.slice(11, 16)}</Text>
             </View>
           );
         }}
       />
       <View style={s.chatInputRow}>
+        <TouchableOpacity style={s.chatPhotoBtn} onPress={sendPhoto} disabled={sendingPhoto}>
+          <Text style={{ fontSize: 22 }}>{sendingPhoto ? "⏳" : "📷"}</Text>
+        </TouchableOpacity>
         <TextInput
           style={s.chatInput}
           value={text}
@@ -585,6 +619,8 @@ const s = StyleSheet.create({
   chatInputRow:   { flexDirection: "row", gap: 8, padding: Spacing.sm, backgroundColor: Colors.surfaceLight, borderTopWidth: 1, borderTopColor: Colors.border },
   chatInput:      { flex: 1, borderWidth: 2, borderColor: Colors.border, borderRadius: Radius.lg, paddingHorizontal: Spacing.md, paddingVertical: 10, backgroundColor: "#fff", fontSize: FontSize.base, maxHeight: 100 },
   chatSendBtn:    { width: 46, height: 46, borderRadius: 23, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
+  chatPhotoBtn:   { width: 46, height: 46, borderRadius: 23, backgroundColor: Colors.cardLight, alignItems: "center", justifyContent: "center" },
+  chatImage:      { width: 200, height: 200, borderRadius: Radius.md, marginBottom: 6, backgroundColor: Colors.cardLight },
   chatSendDim:    { backgroundColor: Colors.primary + "60" },
   chatEmpty:      { textAlign: "center", color: Colors.textSecondary, padding: Spacing.xl },
 

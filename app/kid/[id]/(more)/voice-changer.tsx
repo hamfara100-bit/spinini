@@ -190,7 +190,7 @@ export default function VoiceChangerScreen() {
       const message: FamilyMessage = {
         id: uid(),
         text: `🎙️ Voice message with ${rec.fxEmoji} ${rec.fxLabel} effect${sendNote.trim() ? `\n"${sendNote.trim()}"` : ""}`,
-        imageUri: sharedUri,      // repurposed to carry the audio URI
+        audioUri: sharedUri,
         authorId: id,
         authorName: kid?.profile.name ?? "Kid",
         recipients: [],           // broadcast to whole family
