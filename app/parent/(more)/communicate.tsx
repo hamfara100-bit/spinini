@@ -15,6 +15,7 @@ import { PASTEL_COLORS } from "../../../lib/data/types";
 import { uid, nowIso } from "../../../lib/utils";
 import { uploadMedia } from "../../../lib/media-upload";
 import { useKeyboardHeight } from "../../../hooks/use-keyboard-height";
+import { ChatStickerPicker } from "../../../components/chat-sticker-picker";
 import { createCommsTransport, type CommsTransport } from "../../../lib/comms/transport";
 import type { CallContact, CallMode, IncomingCall } from "../../../lib/data/types";
 
@@ -54,6 +55,7 @@ function ChatTab() {
   const [filter, setFilter] = useState<string>("all");
   const [peerCount, setPeerCount] = useState(0);
   const [sendingPhoto, setSendingPhoto] = useState(false);
+  const [showStickers, setShowStickers] = useState(false);
   const kbHeight = useKeyboardHeight();
 
   const coParents = state.coParents ?? [];
@@ -89,7 +91,7 @@ function ChatTab() {
       dispatch({
         type: "FAMILY_CHAT_PUSH",
         message: {
-          id: m.id, text: m.text, imageUri: (m as any).imageUri, audioUri: (m as any).audioUri,
+          id: m.id, text: m.text, imageUri: (m as any).imageUri, audioUri: (m as any).audioUri, sticker: (m as any).sticker,
           authorId: m.authorId, authorName: m.authorName,
           recipients: m.recipients ?? [], sentAt: m.sentAt, readBy: [m.authorId],
         },
@@ -145,11 +147,22 @@ function ChatTab() {
     }
   }
 
+  function sendSticker(emoji: string) {
+    const id = uid();
+    const sentAt = nowIso();
+    const recipients = filter === "all" ? [] : [filter];
+    seenIds.current.add(id);
+    const msg = { id, sticker: emoji, authorId: AUTHOR_ID, authorName: AUTHOR_NAME, sentAt, recipients };
+    dispatch({ type: "FAMILY_CHAT_PUSH", message: { ...msg, readBy: [AUTHOR_ID] } });
+    transportRef.current?.send(msg as any);
+  }
+
   const isCoParentDM = coParents.some(cp => cp.id === filter);
   const selectedCoParent = coParents.find(cp => cp.id === filter);
 
   return (
     <View style={{ flex: 1, paddingBottom: kbHeight }}>
+      <ChatStickerPicker visible={showStickers} onClose={() => setShowStickers(false)} onPick={sendSticker} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterBar}>
         <TouchableOpacity style={[s.filterChip, filter === "all" && s.filterChipActive]} onPress={() => setFilter("all")}>
           <Text style={[s.filterText, filter === "all" && s.filterTextActive]}>👨‍👩‍👧 Everyone</Text>
@@ -203,6 +216,15 @@ function ChatTab() {
         ListEmptyComponent={<Text style={s.empty}>No messages yet. Say hi!</Text>}
         renderItem={({ item }) => {
           const isMe = item.authorId === AUTHOR_ID;
+          if (item.sticker) {
+            return (
+              <View style={[s.stickerWrap, isMe ? { alignSelf: "flex-end" } : { alignSelf: "flex-start" }]}>
+                {!isMe && <Text style={s.author}>{item.authorName}</Text>}
+                <Text style={s.stickerBig}>{item.sticker}</Text>
+                <Text style={s.time}>{item.sentAt.slice(11,16)}</Text>
+              </View>
+            );
+          }
           return (
             <View style={[s.bubble, isMe ? s.bubbleMe : s.bubbleThem]}>
               {!isMe && <Text style={s.author}>{item.authorName}</Text>}
@@ -218,6 +240,9 @@ function ChatTab() {
       <View style={s.inputRow}>
         <TouchableOpacity style={s.photoBtn} onPress={sendPhoto} disabled={sendingPhoto}>
           <Text style={{ fontSize: 22 }}>{sendingPhoto ? "⏳" : "📷"}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.photoBtn} onPress={() => setShowStickers(true)}>
+          <Text style={{ fontSize: 22 }}>😀</Text>
         </TouchableOpacity>
         <TextInput
           style={s.input}
@@ -922,6 +947,8 @@ const s = StyleSheet.create({
   sendBtn:    { width: 46, height: 46, borderRadius: 23, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
   photoBtn:   { width: 46, height: 46, borderRadius: 23, backgroundColor: Colors.cardLight, alignItems: "center", justifyContent: "center" },
   chatImage:  { width: 200, height: 200, borderRadius: Radius.md, marginBottom: 6, backgroundColor: Colors.cardLight },
+  stickerWrap:{ maxWidth: "78%", marginBottom: 8, paddingHorizontal: 4 },
+  stickerBig: { fontSize: 72, lineHeight: 84 },
   sendBtnDim: { backgroundColor: Colors.primary + "60" },
   empty:      { textAlign: "center", color: Colors.textSecondary, padding: Spacing.xl },
 

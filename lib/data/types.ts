@@ -548,6 +548,7 @@ export interface FamilyMessage {
   text?: string;
   imageUri?: string;   // a shared photo
   audioUri?: string;   // a shared voice/audio clip
+  sticker?: string;    // an emoji sticker
   authorId: string;
   authorName: string;
   recipients: string[];
