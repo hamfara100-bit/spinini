@@ -5,7 +5,15 @@ import { uid } from "../utils";
 import { saveRecoveryCode } from "../secure-tokens";
 import { useFamilySync } from "./sync-bridge";
 import { notificationFeature } from "./badges";
-import { tttEmpty, tttWinner, tttFull, tttMarkForSeat, c4Empty, c4Drop, c4Winner, c4Full } from "../games/engine";
+import {
+  tttEmpty, tttWinner, tttFull, tttMarkForSeat, c4Empty, c4Drop, c4Winner, c4Full,
+  otherSeat,
+  pickHangmanWord, hangmanSolved, HANGMAN_MAX_WRONG,
+  memoryDeck, type MemoryCard,
+  checkersInit, checkersMoves, checkersApply, checkersWinner,
+  chessInit, chessLegalMoves, chessApply, chessStatus, type ChessState,
+  trashInit, trashTurn, type TrashState,
+} from "../games/engine";
 import {
   AppState, AppAction, KidState, KidProfile, KidRules,
   MoneyState, BehaviorScoreState, PermissionLedger, FamilyFilterStatus, CloudBackupConfig,
@@ -330,26 +338,125 @@ function updateKid(state: AppState, kidId: string, updater: (k: KidState) => Kid
 }
 
 // ── Online Game Night helpers ────────────────────────────────────────────────
-function ogInitBoard(gameId: "ttt" | "connect4"): any {
-  return gameId === "ttt" ? tttEmpty() : c4Empty();
+const MEMORY_PAIRS_ONLINE = 6;
+
+function ogInitBoard(gameId: import("./types").OnlineGameId): any {
+  switch (gameId) {
+    case "ttt":      return tttEmpty();
+    case "connect4": return c4Empty();
+    case "hangman":  return { word: pickHangmanWord(), guessed: [] as string[], wrong: 0 };
+    case "memory":   return { deck: memoryDeck(MEMORY_PAIRS_ONLINE), flipped: [] as number[], scores: [0, 0] as [number, number] };
+    case "checkers": return checkersInit();
+    case "chess":    return chessInit();
+    case "trash":    return trashInit();
+    default:         return tttEmpty();
+  }
 }
-function ogApplyMove(session: any): (seat: 0 | 1, index: number) => any {
-  return (seat, index) => {
-    if (session.gameId === "ttt") {
+
+/**
+ * Apply one online move. Returns the next { board, turn, winner } patch, or null
+ * if the move is illegal/ignored. `turn` is the seat to move NEXT; `winner` is
+ * 0 | 1 | "draw" | null. The board is whatever engine-state that game uses.
+ */
+function ogApply(session: any, seat: 0 | 1, move: any): { board: any; turn: 0 | 1; winner: 0 | 1 | "draw" | null } | null {
+  const flip = (s: 0 | 1): 0 | 1 => (s === 0 ? 1 : 0);
+  switch (session.gameId) {
+    case "ttt": {
+      const idx = typeof move === "number" ? move : move?.index;
       const board = (session.board as any[]).slice();
-      if (board[index] != null) return null;            // occupied
-      board[index] = tttMarkForSeat(seat);
+      if (board[idx] != null) return null;
+      board[idx] = tttMarkForSeat(seat);
       const win = tttWinner(board);
       const winner = win ? seat : (tttFull(board) ? "draw" : null);
-      return { board, winner };
-    } else {
-      const dropped = c4Drop(session.board, index, seat);
-      if (!dropped) return null;                          // column full
+      return { board, turn: winner != null ? seat : flip(seat), winner };
+    }
+    case "connect4": {
+      const col = typeof move === "number" ? move : move?.col;
+      const dropped = c4Drop(session.board, col, seat);
+      if (!dropped) return null;
       const win = c4Winner(dropped.board);
       const winner = win ? seat : (c4Full(dropped.board) ? "draw" : null);
-      return { board: dropped.board, winner };
+      return { board: dropped.board, turn: winner != null ? seat : flip(seat), winner };
     }
-  };
+    case "hangman": {
+      const letter: string = (typeof move === "string" ? move : move?.letter ?? "").toUpperCase();
+      if (!letter) return null;
+      const b = session.board as { word: string; guessed: string[]; wrong: number };
+      if (b.guessed.includes(letter)) return null;
+      const guessed = [...b.guessed, letter];
+      const gset = new Set(guessed);
+      if (b.word.includes(letter)) {
+        if (hangmanSolved(b.word, gset)) {
+          return { board: { ...b, guessed }, turn: seat, winner: seat }; // solver wins
+        }
+        return { board: { ...b, guessed }, turn: flip(seat), winner: null };
+      } else {
+        const wrong = b.wrong + 1;
+        if (wrong >= HANGMAN_MAX_WRONG) {
+          return { board: { ...b, guessed, wrong }, turn: seat, winner: "draw" }; // word survives
+        }
+        return { board: { ...b, guessed, wrong }, turn: flip(seat), winner: null };
+      }
+    }
+    case "memory": {
+      const b = session.board as { deck: MemoryCard[]; flipped: number[]; scores: [number, number] };
+      // Special "clear" move: hide the two mismatched cards and pass turn.
+      if (move?.clear) {
+        return { board: { ...b, flipped: [] }, turn: flip(seat), winner: null };
+      }
+      const idx = typeof move === "number" ? move : move?.index;
+      if (idx == null) return null;
+      if (b.flipped.length >= 2) return null;                 // waiting for clear
+      const card = b.deck[idx];
+      if (!card || card.matched || b.flipped.includes(idx)) return null;
+      const flipped = [...b.flipped, idx];
+      if (flipped.length < 2) {
+        return { board: { ...b, flipped }, turn: seat, winner: null }; // first card — same player
+      }
+      const [a, c] = flipped;
+      if (b.deck[a].emoji === b.deck[c].emoji) {
+        const deck = b.deck.map((cc, i) => (i === a || i === c ? { ...cc, matched: true } : cc));
+        const scores: [number, number] = seat === 0 ? [b.scores[0] + 1, b.scores[1]] : [b.scores[0], b.scores[1] + 1];
+        const done = deck.every(cc => cc.matched);
+        const winner = done ? (scores[0] === scores[1] ? "draw" : scores[0] > scores[1] ? 0 : 1) : null;
+        // Match → same player goes again; board clears the flipped pair immediately.
+        return { board: { deck, flipped: [], scores }, turn: seat, winner };
+      }
+      // Mismatch → keep both shown; the acting device will dispatch {clear:true}.
+      return { board: { ...b, flipped }, turn: seat, winner: null };
+    }
+    case "checkers": {
+      const from = move?.from, to = move?.to;
+      if (!from || !to) return null;
+      const legal = checkersMoves(session.board, seat);
+      const m = legal.find((x: any) => x.from[0] === from[0] && x.from[1] === from[1] && x.to[0] === to[0] && x.to[1] === to[1]);
+      if (!m) return null;
+      const board = checkersApply(session.board, m);
+      const next = flip(seat);
+      const w = checkersWinner(board, next);
+      return { board, turn: next, winner: w === null ? null : (w as 0 | 1) };
+    }
+    case "chess": {
+      const st = session.board as ChessState;
+      const from = move?.from, to = move?.to;
+      if (!from || !to) return null;
+      const legal = chessLegalMoves(st, seat);
+      const m = legal.find((x) => x.from[0] === from[0] && x.from[1] === from[1] && x.to[0] === to[0] && x.to[1] === to[1]);
+      if (!m) return null;
+      const board = chessApply(st, m);
+      const status = chessStatus(board);
+      if (status === "checkmate") return { board, turn: board.turn, winner: seat };
+      if (status === "stalemate") return { board, turn: board.turn, winner: "draw" };
+      return { board, turn: board.turn, winner: null };
+    }
+    case "trash": {
+      const source: "stock" | "discard" = move?.source === "discard" ? "discard" : "stock";
+      const res = trashTurn(session.board as TrashState, seat, source);
+      return { board: res.state, turn: res.state.turn as 0 | 1, winner: res.winner === null ? null : (res.winner as 0 | 1) };
+    }
+    default:
+      return null;
+  }
 }
 
 function reducer(state: AppState, action: AppAction): AppState {
@@ -379,7 +486,7 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "OGAME_MOVE": {
       const g = state.onlineGame;
       if (!g || g.status !== "playing" || g.turn !== action.seat) return state;
-      const res = ogApplyMove(g)(action.seat, action.index);
+      const res = ogApply(g, action.seat, action.move);
       if (!res) return state; // illegal move
       return {
         ...state,
@@ -388,7 +495,7 @@ function reducer(state: AppState, action: AppAction): AppState {
           board: res.board,
           winner: res.winner,
           status: res.winner != null ? "finished" : "playing",
-          turn: res.winner != null ? g.turn : (g.turn === 0 ? 1 : 0),
+          turn: res.turn,
           updatedAt: new Date().toISOString(),
         },
       };

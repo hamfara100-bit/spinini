@@ -2026,7 +2026,7 @@ export interface AppState {
 }
 
 // ─── Online (cross-device) Game Night ────────────────────────────────────────
-export type OnlineGameId = "ttt" | "connect4";
+export type OnlineGameId = "ttt" | "connect4" | "hangman" | "memory" | "checkers" | "chess" | "trash";
 
 export interface OnlineGamePlayer {
   id: string;          // "parent" or a kid profile id
@@ -2158,7 +2158,7 @@ export type AppAction =
   | { type: "OGAME_CREATE"; session: OnlineGameSession }
   | { type: "OGAME_JOIN"; playerId: string; playerName: string }
   | { type: "OGAME_START" }
-  | { type: "OGAME_MOVE"; seat: 0 | 1; index: number }   // index = cell (TTT) or column (C4)
+  | { type: "OGAME_MOVE"; seat: 0 | 1; move: any }   // move shape varies per game (see ogApply)
   | { type: "OGAME_RESET" }
   | { type: "OGAME_END" }
   // Setup
