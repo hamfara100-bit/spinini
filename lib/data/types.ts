@@ -1387,6 +1387,15 @@ export interface FamilySocialComment {
   parentCommentId?: string; // set when this comment is a reply to another comment
 }
 
+/** A song attached to a social post — a 30s preview from the free music search. */
+export interface SocialMusic {
+  id: string;
+  title: string;
+  artist: string;
+  previewUrl: string;   // 30-second preview mp3/m4a
+  artworkUrl?: string;
+}
+
 export interface FamilySocialPost {
   id: string;
   authorId: string; // "parent" | kidId
@@ -1394,6 +1403,7 @@ export interface FamilySocialPost {
   mediaUris: string[]; // local file URIs
   thumbnailUri?: string; // video thumbnail
   caption: string;
+  music?: SocialMusic;   // optional background song (plays while the post is shown)
   likes: string[]; // authorIds who liked
   comments: FamilySocialComment[];
   viewedBy: string[]; // who has viewed

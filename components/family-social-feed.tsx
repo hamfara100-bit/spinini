@@ -15,10 +15,13 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { VideoView, useVideoPlayer } from "expo-video";
+import { createAudioPlayer } from "expo-audio";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import { MicButton } from "./voice-text-input";
 import { MemeStickerPicker, StickerDisplay, decodeStickerUri } from "./meme-sticker-picker";
+import { MusicPicker } from "./music-picker";
+import type { MusicTrack } from "../lib/music-search";
 import { Colors, FontSize, Radius } from "../lib/theme";
 import { uid, nowIso } from "../lib/utils";
 import { uploadMediaMany } from "../lib/media-upload";
@@ -44,11 +47,13 @@ function timeSince(iso: string) {
 }
 
 // ─── Single video player item ─────────────────────────────────────────────────
-function VideoItem({ uri, isActive }: { uri: string; isActive: boolean }) {
+function VideoItem({ uri, isActive, muted = false }: { uri: string; isActive: boolean; muted?: boolean }) {
   const player = useVideoPlayer(uri, p => {
     p.loop = true;
-    p.muted = false;
+    p.muted = muted;
   });
+
+  useEffect(() => { try { player.muted = muted; } catch {} }, [muted]);
 
   useEffect(() => {
     if (isActive) {
@@ -91,6 +96,30 @@ function HeartBurst({ visible }: { visible: boolean }) {
 }
 
 // ─── Post card ───────────────────────────────────────────────────────────────
+// ─── Music ticker (spinning disc + scrolling title) ───────────────────────────
+function MusicTicker({ title, artist, playing }: { title: string; artist: string; playing: boolean }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!playing) return;
+    const loop = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 3000, useNativeDriver: true }));
+    loop.start();
+    return () => { loop.stop(); spin.setValue(0); };
+  }, [playing]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+  return (
+    <View style={mt.row}>
+      <Animated.Text style={[mt.disc, { transform: [{ rotate }] }]}>💿</Animated.Text>
+      <Text style={mt.text} numberOfLines={1}>{title} · {artist}</Text>
+    </View>
+  );
+}
+
+const mt = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, backgroundColor: "rgba(0,0,0,0.35)", alignSelf: "flex-start", borderRadius: 50, paddingHorizontal: 10, paddingVertical: 5, maxWidth: "85%" },
+  disc: { fontSize: 16 },
+  text: { color: "#fff", fontSize: 12, fontWeight: "700", flexShrink: 1, textShadowColor: "#000", textShadowRadius: 2 },
+});
+
 function PostCard({
   post,
   isActive,
@@ -119,6 +148,20 @@ function PostCard({
       dispatch({ type: "SOCIAL_POST_VIEW", postId: post.id, viewerId });
     }
   }, [isActive]);
+
+  // Play the attached song (looping 30s preview) while this post is on screen.
+  const musicRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
+  useEffect(() => {
+    if (!post.music || !isActive) return;
+    let p: ReturnType<typeof createAudioPlayer> | null = null;
+    try {
+      p = createAudioPlayer(post.music.previewUrl);
+      p.loop = true;
+      p.play();
+      musicRef.current = p;
+    } catch {}
+    return () => { try { p?.pause(); p?.remove(); } catch {} musicRef.current = null; };
+  }, [isActive, post.music?.id]);
 
   function toggleLike() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -157,7 +200,7 @@ function PostCard({
       {/* Media layer */}
       <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={handleDoubleTap}>
         {post.type === "video" && post.mediaUris[0] ? (
-          <VideoItem uri={post.mediaUris[0]} isActive={isActive} />
+          <VideoItem uri={post.mediaUris[0]} isActive={isActive} muted={!!post.music} />
         ) : post.type === "gif" && post.mediaUris[0] ? (
           // Animated GIF via expo-image
           <Image
@@ -254,6 +297,7 @@ function PostCard({
         {post.type !== "text" && post.caption ? (
           <Text style={fb.caption} numberOfLines={3}>{post.caption}</Text>
         ) : null}
+        {post.music && <MusicTicker title={post.music.title} artist={post.music.artist} playing={isActive} />}
         <Text style={fb.timeAgo}>{timeSince(post.createdAt)}</Text>
         {post.mediaUris.length > 1 && (
           <Text style={fb.swipeHint}>← Swipe photos →</Text>
@@ -404,8 +448,10 @@ export function CreatePostModal({
   const [textColor, setTextColor] = useState("#FFFFFF");
   const [showFunPicker, setShowFunPicker] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [music, setMusic] = useState<MusicTrack | null>(null);
+  const [showMusicPicker, setShowMusicPicker] = useState(false);
 
-  function reset() { setStep("pick"); setMediaUris([]); setCaption(""); setMediaType("photo"); setShowFunPicker(false); setPosting(false); }
+  function reset() { setStep("pick"); setMediaUris([]); setCaption(""); setMediaType("photo"); setShowFunPicker(false); setPosting(false); setMusic(null); setShowMusicPicker(false); }
   function handleClose() { reset(); onClose(); }
 
   function handleFunSelect(uri: string, type: "meme" | "gif" | "sticker") {
@@ -466,6 +512,7 @@ export function CreatePostModal({
       type: mediaType,
       mediaUris: finalUris,
       caption: caption.trim(),
+      music: music ?? undefined,
       likes: [],
       comments: [],
       viewedBy: [authorId],
@@ -595,6 +642,23 @@ export function CreatePostModal({
                 autoFocus
               />
 
+              {/* 🎵 Add music to the post */}
+              {music ? (
+                <View style={cp.musicChip}>
+                  <Text style={{ fontSize: 18 }}>🎵</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={cp.musicTitle} numberOfLines={1}>{music.title}</Text>
+                    <Text style={cp.musicArtist} numberOfLines={1}>{music.artist}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowMusicPicker(true)}><Text style={cp.musicChange}>Change</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setMusic(null)}><Text style={{ color: Colors.error, fontWeight: "800", fontSize: 16, paddingHorizontal: 6 }}>✕</Text></TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={cp.addMusicBtn} onPress={() => setShowMusicPicker(true)}>
+                  <Text style={cp.addMusicText}>🎵 Add Music</Text>
+                </TouchableOpacity>
+              )}
+
               <View style={cp.tips}>
                 <Text style={cp.tipsTitle}>💡 Ideas:</Text>
                 <Text style={cp.tipsText}>• Share what you made, learned or are proud of{"\n"}• Share a funny moment{"\n"}• Show your family your art, drawing or project{"\n"}• Tell them something exciting that happened!</Text>
@@ -608,6 +672,12 @@ export function CreatePostModal({
         visible={showFunPicker}
         onClose={() => setShowFunPicker(false)}
         onSelect={handleFunSelect}
+      />
+      {/* Music search + attach */}
+      <MusicPicker
+        visible={showMusicPicker}
+        onClose={() => setShowMusicPicker(false)}
+        onSelect={setMusic}
       />
     </Modal>
   );
@@ -896,6 +966,12 @@ const cp = StyleSheet.create({
   tips: { backgroundColor: "#1A1A2E", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#333" },
   tipsTitle: { color: "#888", fontSize: 13, fontWeight: "700", marginBottom: 6 },
   tipsText: { color: "#666", fontSize: 12, lineHeight: 20 },
+  addMusicBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#7C5CFF22", borderRadius: 14, paddingVertical: 14, borderWidth: 1.5, borderColor: "#7C5CFF55" },
+  addMusicText: { color: "#B9A8FF", fontWeight: "800", fontSize: 15 },
+  musicChip: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#1A1A2E", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#7C5CFF55" },
+  musicTitle: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  musicArtist: { color: "#9b95c0", fontSize: 12, marginTop: 1 },
+  musicChange: { color: "#B9A8FF", fontWeight: "700", fontSize: 13, paddingHorizontal: 6 },
   funCard: { backgroundColor: "#FFD70020", borderColor: "#FFD70060", borderWidth: 2 },
   stickerPreview: {
     height: 160, borderRadius: 16, overflow: "hidden",
