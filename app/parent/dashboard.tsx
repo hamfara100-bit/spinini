@@ -380,20 +380,16 @@ export default function ParentDashboard() {
       : feature.id === "communicate" ? (chatBadge || undefined)
       : undefined;
 
-    // Game Night renders via the parent-side wrapper so the parent stays in
-    // parent mode (the screen itself lives under the kid layout).
+    // Game Night → straight to the online (cross-device) game page. The parent
+    // picks a game and everyone is invited; whoever joins first plays.
     function handlePress() {
       if (feature.id === "game-night") {
         if (state.kids.length === 0) {
           Alert.alert("No kids yet", "Add a child first to start Game Night!");
           return;
         }
-        if (state.kids.length === 1) {
-          router.push(`/parent/(more)/game-night?kidId=${state.kids[0].profile.id}` as any);
-          return;
-        }
-        // Multiple kids: navigate to Family tab which has the picker
-        router.push("/parent/family" as any);
+        const pName = state.parentSettings.name || state.parent.name || "Parent";
+        router.push(`/online-game?me=parent&name=${encodeURIComponent(pName)}` as any);
         return;
       }
       router.push(route as any);

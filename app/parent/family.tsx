@@ -19,11 +19,10 @@ export default function FamilyScreen() {
       Alert.alert("No kids yet", "Add a child first to start Game Night!");
       return;
     }
-    if (state.kids.length === 1) {
-      router.push(`/parent/(more)/game-night?kidId=${state.kids[0].profile.id}` as any);
-      return;
-    }
-    setShowGamePicker(true);
+    // Straight to the online game page — pick a game, everyone's invited, first
+    // to join plays. No kid picker / management list.
+    const pName = state.parentSettings.name || state.parent.name || "Parent";
+    router.push(`/online-game?me=parent&name=${encodeURIComponent(pName)}` as any);
   }
 
   function removeKid(kidId: string) {
