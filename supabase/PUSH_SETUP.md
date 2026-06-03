@@ -8,19 +8,22 @@ The app code is already wired and ships inert: it no-ops until you complete the
 
 ## 1. Firebase project (gives the app an FCM identity)
 
-1. Firebase console → **Add project** (or reuse one) for `com.famkids.app`.
+The Gradle wiring is **already done** — `com.google.gms:google-services` is on the
+classpath and is applied automatically *only when* `android/app/google-services.json`
+exists (see the bottom of `android/app/build.gradle`). `firebase-messaging` already
+ships via `expo-notifications`. So you only need to drop in the file:
+
+1. Firebase console → **Add project** (or reuse one).
 2. **Add app → Android**, package name `com.famkids.app`, download
    **`google-services.json`** and place it at `android/app/google-services.json`.
-3. Ensure the Google Services Gradle plugin is applied (Expo's `expo-notifications`
-   config plugin + a prebuild normally do this; if building `android/` directly,
-   add `classpath 'com.google.gms:google-services:4.4.2'` to `android/build.gradle`
-   and `apply plugin: 'com.google.gms.google-services'` at the bottom of
-   `android/app/build.gradle`).
-4. Rebuild the APK. Devices now obtain an FCM token on launch
-   (`registerForPush` in `lib/push.ts`).
+3. Rebuild the APK. The build log prints `google-services.json found -> FCM enabled`
+   and devices obtain an FCM token on launch (`registerForPush` in `lib/push.ts`).
 
 > Emulators without Google Play Services can't get an FCM token — test on a real
 > device (e.g. the Samsung S25).
+>
+> If you ever run `expo prebuild`, also add `"googleServicesFile": "./google-services.json"`
+> under `expo.android` in app.json so prebuild copies it.
 
 ## 2. Database — token table
 
