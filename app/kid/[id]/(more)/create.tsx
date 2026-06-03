@@ -216,14 +216,18 @@ export default function CreateScreen() {
 
   function onCanvasSave(paths: DrawingPath[], stickers: any[], imageUri: string) {
     setDrawOpen(false);
-    setPendingSave({ paths, stickers, imageUri });
-    setDraftName(editingDrawing?.id === "__draft__" ? "" : (editingDrawing?.title ?? ""));
-    setNameModalVisible(true);
+    // Auto-save with an automatic name (no prompt) — editing keeps its title,
+    // a new drawing gets "Drawing N". The child can rename it later from the list.
+    const isEdit = editingDrawing && editingDrawing.id !== "__draft__";
+    const autoName = isEdit
+      ? (editingDrawing?.title || `Drawing ${(kid?.drawings?.length ?? 0)}`)
+      : `Drawing ${(kid?.drawings?.length ?? 0) + 1}`;
+    void commitSave(autoName, { paths, stickers, imageUri });
   }
 
-  async function commitSave(name: string) {
-    if (!pendingSave) return;
-    const { paths, stickers, imageUri } = pendingSave;
+  async function commitSave(name: string, data = pendingSave) {
+    if (!data) return;
+    const { paths, stickers, imageUri } = data;
     const title = name.trim() || `Drawing ${new Date().toLocaleDateString()}`;
     // Upload the rendered image so it shows on the parent's device too.
     const sharedImage = imageUri ? (await uploadMedia(imageUri, { folder: "drawings" })) ?? imageUri : imageUri;
@@ -533,11 +537,20 @@ function DrawTab({
   kidId, drawings, dispatch, onNew, onEdit,
 }: { kidId: string; drawings: any[]; dispatch: any; onNew: () => void; onEdit: (d: any) => void }) {
   const { openShare, ShareModal } = useShareToSocial(kidId);
+  const [renaming, setRenaming] = useState<any | null>(null);
+  const [renameText, setRenameText] = useState("");
   function confirmDelete(d: any) {
     Alert.alert("Delete Drawing", `Delete "${d.title ?? "this drawing"}"?`, [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: () => dispatch({ type: "REMOVE_DRAWING", kidId, drawingId: d.id }) },
     ]);
+  }
+  function openRename(d: any) { setRenaming(d); setRenameText(d.title ?? ""); }
+  function saveRename() {
+    if (renaming && renameText.trim()) {
+      dispatch({ type: "UPDATE_DRAWING", kidId, drawingId: renaming.id, payload: { title: renameText.trim() } });
+    }
+    setRenaming(null); setRenameText("");
   }
 
   return (
@@ -601,10 +614,10 @@ function DrawTab({
 
                 {/* Title + actions */}
                 <View style={styles.drawingCardFooter}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.drawingCardTitle} numberOfLines={1}>{d.title ?? "Untitled"}</Text>
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => openRename(d)} activeOpacity={0.7}>
+                    <Text style={styles.drawingCardTitle} numberOfLines={1}>{d.title ?? "Untitled"} ✏️</Text>
                     <Text style={styles.drawingCardDate}>{new Date(d.createdAt).toLocaleDateString()}</Text>
-                  </View>
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => openShare(d.imageUri, d.title)} style={styles.drawingShareBtn}>
                     <Text style={styles.drawingShareIcon}>📱</Text>
                   </TouchableOpacity>
@@ -618,6 +631,31 @@ function DrawTab({
         </>
       )}
       {ShareModal}
+
+      <Modal visible={!!renaming} transparent animationType="fade" onRequestClose={() => setRenaming(null)}>
+        <View style={styles.renameOverlay}>
+          <View style={styles.renameCard}>
+            <Text style={styles.renameTitle}>✏️ Rename drawing</Text>
+            <TextInput
+              style={styles.renameInput}
+              value={renameText}
+              onChangeText={setRenameText}
+              placeholder="Drawing name"
+              autoFocus
+              onSubmitEditing={saveRename}
+              returnKeyType="done"
+            />
+            <View style={styles.renameBtns}>
+              <TouchableOpacity style={styles.renameCancel} onPress={() => setRenaming(null)}>
+                <Text style={styles.renameCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.renameSave} onPress={saveRename}>
+                <Text style={styles.renameSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1054,6 +1092,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm, paddingVertical: 8, gap: 4,
   },
   drawingCardTitle: { fontSize: FontSize.sm, fontWeight: "700", color: Colors.textPrimary },
+  renameOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: Spacing.lg },
+  renameCard: { width: "100%", maxWidth: 360, backgroundColor: Colors.surfaceLight, borderRadius: Radius.xl, padding: Spacing.lg, gap: 12 },
+  renameTitle: { fontSize: FontSize.md, fontWeight: "800", color: Colors.primary, textAlign: "center" },
+  renameInput: { borderWidth: 2, borderColor: Colors.border, borderRadius: Radius.lg, padding: Spacing.md, fontSize: FontSize.base, color: Colors.textPrimary, backgroundColor: Colors.bgLight },
+  renameBtns: { flexDirection: "row", gap: 10 },
+  renameCancel: { flex: 1, borderWidth: 2, borderColor: Colors.border, borderRadius: Radius.full, alignItems: "center", paddingVertical: 12 },
+  renameCancelText: { fontWeight: "700", color: Colors.textSecondary },
+  renameSave: { flex: 2, backgroundColor: Colors.primary, borderRadius: Radius.full, alignItems: "center", paddingVertical: 12 },
+  renameSaveText: { color: "#fff", fontWeight: "800" },
   drawingCardDate: { fontSize: 10, color: Colors.textMuted, marginTop: 1 },
   drawingDeleteBtn: { padding: 4 },
   drawingDeleteIcon: { fontSize: 16 },

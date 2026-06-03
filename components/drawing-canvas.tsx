@@ -11,6 +11,7 @@ import Svg, {
 import { SvgXml } from "react-native-svg";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import * as ImagePicker from "expo-image-picker";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as Haptics from "expo-haptics";
 import * as MediaLibrary from "expo-media-library";
 import { Colors, Radius, Spacing, FontSize, Shadow } from "../lib/theme";
@@ -76,6 +77,29 @@ const VEHICLE_EMOJIS: Record<string, string> = {
 const BRUSH_SIZES = [2, 5, 10, 18, 28];
 
 type Tool = "pen" | "sketch" | "highlight" | "eraser" | "sticker" | "fill";
+
+// Realistic pencil sketch = several thin, offset, grainy (dashed) passes layered
+// at low opacity so the line looks hand-drawn / hatched rather than solid.
+const SKETCH_LAYERS: { dx: number; dy: number; wf: number; op: number; dash: string }[] = [
+  { dx: 0,    dy: 0,    wf: 0.55, op: 0.36, dash: "0.5,2.5" },
+  { dx: 1.3,  dy: -0.9, wf: 0.45, op: 0.30, dash: "1,3" },
+  { dx: -1.1, dy: 1.0,  wf: 0.40, op: 0.26, dash: "0.5,3" },
+  { dx: 0.7,  dy: 1.5,  wf: 0.34, op: 0.22, dash: "1,3.5" },
+  { dx: -1.5, dy: -0.6, wf: 0.30, op: 0.18, dash: "0.5,3.5" },
+];
+
+function renderSketch(d: string, color: string, width: number, keyPrefix: string) {
+  return (
+    <React.Fragment key={keyPrefix}>
+      {SKETCH_LAYERS.map((L, k) => (
+        <Path key={`${keyPrefix}-${k}`} d={d} stroke={color}
+          strokeWidth={Math.max(0.6, width * L.wf)} strokeOpacity={L.op}
+          fill="none" strokeLinecap="round" strokeLinejoin="round"
+          strokeDasharray={L.dash} transform={`translate(${L.dx},${L.dy})`} />
+      ))}
+    </React.Fragment>
+  );
+}
 
 type Sticker = DrawingSticker;
 interface CanvasState { paths: DrawingPath[]; stickers: Sticker[]; bg?: string }
@@ -406,14 +430,22 @@ export function DrawingCanvas({
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
+  // Shrink a picked photo so it fits the drawing screen (and uses less memory).
+  async function shrinkToFit(uri: string): Promise<string> {
+    try {
+      const r = await manipulateAsync(uri, [{ resize: { width: 1280 } }], { compress: 0.8, format: SaveFormat.JPEG });
+      return r.uri;
+    } catch { return uri; }
+  }
+
   async function pickFromGallery() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
-    if (!result.canceled && result.assets[0]) setBgImage(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) setBgImage(await shrinkToFit(result.assets[0].uri));
   }
 
   async function takePhoto() {
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-    if (!result.canceled && result.assets[0]) setBgImage(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]) setBgImage(await shrinkToFit(result.assets[0].uri));
   }
 
   function deleteSelectedSticker() {
@@ -507,16 +539,7 @@ export function DrawingCanvas({
       <Path key={i} d={p.points} stroke={p.color} strokeWidth={p.width}
         strokeOpacity={0.35} fill="none" strokeLinecap="square" strokeLinejoin="round" />
     );
-    if (p.sketch) return (
-      <React.Fragment key={i}>
-        <Path d={p.points} stroke={p.color} strokeWidth={p.width * 0.8} strokeOpacity={0.85}
-          fill="none" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1,2" />
-        <Path d={p.points} stroke={p.color} strokeWidth={p.width * 0.5} strokeOpacity={0.5}
-          fill="none" strokeLinecap="round" strokeLinejoin="round" transform="translate(2,1)" />
-        <Path d={p.points} stroke={p.color} strokeWidth={p.width * 0.3} strokeOpacity={0.3}
-          fill="none" strokeLinecap="round" strokeLinejoin="round" transform="translate(-1,2)" />
-      </React.Fragment>
-    );
+    if (p.sketch) return renderSketch(p.points, p.color, p.width, `s${i}`);
     if (p.glow) return (
       <React.Fragment key={i}>
         <Path d={p.points} stroke={p.color} strokeWidth={p.width + 10} strokeOpacity={0.25}
@@ -547,7 +570,7 @@ export function DrawingCanvas({
           {/* Background image */}
           {bgImage && (
             <View style={StyleSheet.absoluteFill}>
-              <Image source={{ uri: bgImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <Image source={{ uri: bgImage }} style={StyleSheet.absoluteFill} resizeMode="contain" />
               {photoGlow && <View style={[StyleSheet.absoluteFill, styles.photoGlowOverlay]} />}
             </View>
           )}
@@ -577,12 +600,7 @@ export function DrawingCanvas({
                 <Path key={`l${i}`} d={cp} stroke={color} strokeWidth={brushSize * 3}
                   strokeOpacity={0.35} fill="none" strokeLinecap="square" strokeLinejoin="round" />
               ) : tool === "sketch" ? (
-                <React.Fragment key={`l${i}`}>
-                  <Path d={cp} stroke={color} strokeWidth={brushSize * 0.8}
-                    strokeOpacity={0.85} fill="none" strokeLinecap="round" strokeDasharray="1,2" />
-                  <Path d={cp} stroke={color} strokeWidth={brushSize * 0.4}
-                    strokeOpacity={0.4} fill="none" strokeLinecap="round" transform="translate(2,1)" />
-                </React.Fragment>
+                renderSketch(cp, color, brushSize, `l${i}`)
               ) : glowMode ? (
                 <React.Fragment key={`l${i}`}>
                   <Path d={cp} stroke={color} strokeWidth={brushSize + 10} strokeOpacity={0.25} fill="none" strokeLinecap="round" strokeLinejoin="round" />
