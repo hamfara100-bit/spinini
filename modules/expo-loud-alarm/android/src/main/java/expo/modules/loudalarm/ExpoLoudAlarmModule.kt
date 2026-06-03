@@ -67,27 +67,56 @@ class ExpoLoudAlarmModule : Module() {
     Function("playSystemAlarm") {
       try {
         stopLoopInternal()
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-          ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-          ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        if (uri != null) {
-          val mp = MediaPlayer()
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            mp.setAudioAttributes(
-              AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-            )
-          } else {
-            @Suppress("DEPRECATION")
-            mp.setAudioStreamType(AudioManager.STREAM_ALARM)
+        // Max out the alarm + music volume first so the sound is actually audible.
+        try {
+          val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+          am.setStreamVolume(AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
+        } catch (_: Exception) {}
+
+        val mp = MediaPlayer()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+          mp.setAudioAttributes(
+            AudioAttributes.Builder()
+              .setUsage(AudioAttributes.USAGE_ALARM)
+              .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+              .build()
+          )
+        } else {
+          @Suppress("DEPRECATION")
+          mp.setAudioStreamType(AudioManager.STREAM_ALARM)
+        }
+
+        // 1) Prefer our BUNDLED alarm tone — guaranteed to exist & play, even on
+        //    emulators/devices that have no system alarm ringtone (which made
+        //    playback silent before).
+        var sourced = false
+        try {
+          val resId = context.resources.getIdentifier("spinini_alarm", "raw", context.packageName)
+          if (resId != 0) {
+            val afd = context.resources.openRawResourceFd(resId)
+            if (afd != null) {
+              mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+              afd.close()
+              sourced = true
+            }
           }
-          mp.setDataSource(context, uri)
+        } catch (_: Exception) {}
+
+        // 2) Fallback to the system alarm/ringtone if the bundled asset is missing.
+        if (!sourced) {
+          val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+          if (uri != null) { mp.setDataSource(context, uri); sourced = true }
+        }
+
+        if (sourced) {
           mp.isLooping = true
           mp.prepare()
           mp.start()
           alarmPlayer = mp
+        } else {
+          mp.release()
         }
       } catch (_: Exception) {}
     }
