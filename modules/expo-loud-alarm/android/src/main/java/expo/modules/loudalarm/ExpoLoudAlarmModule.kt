@@ -12,6 +12,7 @@ import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -267,6 +268,45 @@ class ExpoLoudAlarmModule : Module() {
       } else {
         true
       }
+    }
+
+    /** Open the system "Do Not Disturb access" settings for this app. */
+    Function("openDndSettings") {
+      try {
+        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
+          flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        })
+      } catch (_: Exception) {}
+    }
+
+    /**
+     * Android 14+ (API 34) gated USE_FULL_SCREEN_INTENT behind a per-app grant.
+     * Returns true if we may still launch full-screen intents (always true < 34).
+     */
+    Function("canUseFullScreenIntent") {
+      if (Build.VERSION.SDK_INT >= 34) {
+        try {
+          val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+          nm.canUseFullScreenIntent()
+        } catch (_: Exception) { true }
+      } else true
+    }
+
+    /** Open the Android 14+ "full-screen notifications" setting for this app. */
+    Function("openFullScreenIntentSettings") {
+      try {
+        if (Build.VERSION.SDK_INT >= 34) {
+          context.startActivity(Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT").apply {
+            data = android.net.Uri.parse("package:${context.packageName}")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+          })
+        } else {
+          context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+          })
+        }
+      } catch (_: Exception) {}
     }
   }
 }

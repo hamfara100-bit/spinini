@@ -328,6 +328,7 @@ export const initialState: AppState = {
   familyAgreements: [],
   strangerAlerts: [],
   badWordAlerts: [],
+  tamperAlerts: [],
   smartScreenTimeRules: [],
   familyMovies: [],
   familyMusic: [],
@@ -2360,6 +2361,18 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "BADWORD_ALERT_ACK":
       return { ...state, badWordAlerts: (state.badWordAlerts ?? []).map(a => a.id === action.alertId ? { ...a, acknowledged: true } : a) };
 
+    case "TAMPER_ALERT_ADD": {
+      // collapse repeats of the same kid+kind within 60s
+      const dup = (state.tamperAlerts ?? []).some(a =>
+        a.kidId === action.alert.kidId && a.kind === action.alert.kind &&
+        Math.abs(new Date(a.detectedAt).getTime() - new Date(action.alert.detectedAt).getTime()) < 60_000
+      );
+      if (dup) return state;
+      return { ...state, tamperAlerts: [action.alert, ...(state.tamperAlerts ?? [])].slice(0, 100) };
+    }
+    case "TAMPER_ALERT_ACK":
+      return { ...state, tamperAlerts: (state.tamperAlerts ?? []).map(a => a.id === action.alertId ? { ...a, acknowledged: true } : a) };
+
     // ── Feature 17: Smart Screen Time Rules ───────────────────────────────────
     case "SMART_RULE_ADD":
       return { ...state, smartScreenTimeRules: [...(state.smartScreenTimeRules ?? []), action.rule] };
@@ -2444,6 +2457,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             familyAgreements: saved.familyAgreements ?? [],
             strangerAlerts: saved.strangerAlerts ?? [],
             badWordAlerts: saved.badWordAlerts ?? [],
+            tamperAlerts: saved.tamperAlerts ?? [],
             smartScreenTimeRules: saved.smartScreenTimeRules ?? [],
             kids: (saved.kids ?? []).map(k => ({
               ...newKidState(k.profile),

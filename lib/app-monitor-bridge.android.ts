@@ -42,6 +42,61 @@ let socialSubscription: { remove: () => void } | null = null;
 let badWordSubscription: { remove: () => void } | null = null;
 let usageInterval: ReturnType<typeof setInterval> | null = null;
 let strangerInterval: ReturnType<typeof setInterval> | null = null;
+let protectInterval: ReturnType<typeof setInterval> | null = null;
+
+const PROTECT_SNAPSHOT_KEY = "@famkids/protect-snapshot";
+
+/**
+ * On a kid device, detect when a critical protection permission gets turned OFF
+ * (tampering) and raise a synced TAMPER_ALERT so the parent is notified at once.
+ * Compares the current grants to the last snapshot; only true→false transitions
+ * alert. (Force-stop / uninstall can't be self-reported — that needs push.)
+ */
+async function checkProtection() {
+  try {
+    const st = await getState();
+    const isKidDevice = st?.deviceRole === "kid" || (st?.deviceRole == null && (st?.kids?.length ?? 0) > 0);
+    if (!isKidDevice) return;
+    const kid = st?.kids?.[0];
+
+    const safe = (f: () => boolean) => { try { return f(); } catch { return false; } };
+    const current: Record<string, boolean> = {
+      accessibility: safe(() => AppMonitor.isAccessibilityEnabled()),
+      overlay:       safe(() => DeviceLock.hasOverlayPermission()),
+      usage:         safe(() => UsageStats.hasUsagePermission()),
+      notif_access:  safe(() => AppMonitor.isNotificationAccessEnabled()),
+    };
+    const LABELS: Record<string, string> = {
+      accessibility: "Accessibility Service",
+      overlay: "Display over other apps",
+      usage: "Usage Access",
+      notif_access: "Notification Access",
+    };
+
+    const raw = await AsyncStorage.getItem(PROTECT_SNAPSHOT_KEY);
+    const prev: Record<string, boolean> | null = raw ? JSON.parse(raw) : null;
+    await AsyncStorage.setItem(PROTECT_SNAPSHOT_KEY, JSON.stringify(current));
+    if (!prev) return; // first run — establish baseline, don't alert
+
+    const { uid } = await import("./utils");
+    for (const key of Object.keys(current)) {
+      if (prev[key] === true && current[key] === false) {
+        await pushEvent({
+          type: "TAMPER_ALERT_ADD",
+          alert: {
+            id: uid(),
+            kidId: kid?.profile?.id ?? "",
+            kidName: kid?.profile?.name ?? "your child",
+            kind: key,
+            label: LABELS[key] ?? key,
+            detectedAt: new Date().toISOString(),
+            acknowledged: false,
+          },
+        });
+      }
+    }
+  } catch {}
+}
 
 export async function startAppMonitor() {
   // ── Real app usage sync — every 5 min ─────────────────────────────────────
@@ -57,6 +112,11 @@ export async function startAppMonitor() {
   if (strangerInterval) clearInterval(strangerInterval);
   strangerInterval = setInterval(checkStrangerAlerts, 5 * 60 * 1000);
   await checkStrangerAlerts();
+
+  // ── Tamper detection — watch for protection permissions being turned off ──
+  if (protectInterval) clearInterval(protectInterval);
+  protectInterval = setInterval(checkProtection, 20 * 1000);
+  await checkProtection();
 
   // ── Bad-word notification monitoring (independent of accessibility) ───────
   // Reads incoming notifications and, when one contains a bad word, queues a
@@ -209,6 +269,7 @@ export function stopAppMonitor() {
   badWordSubscription = null;
   if (usageInterval)   { clearInterval(usageInterval);   usageInterval   = null; }
   if (strangerInterval){ clearInterval(strangerInterval); strangerInterval = null; }
+  if (protectInterval) { clearInterval(protectInterval);  protectInterval  = null; }
   try { AppMonitor.stopMonitoring(); } catch {}
 }
 

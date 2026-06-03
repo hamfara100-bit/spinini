@@ -11,6 +11,9 @@ let LoudAlarm: {
   cancelFullScreenAlarm: () => void;
   bringToFront: (title: string, body: string) => void;
   hasDndAccess: () => boolean;
+  openDndSettings: () => void;
+  canUseFullScreenIntent: () => boolean;
+  openFullScreenIntentSettings: () => void;
 } | null = null;
 
 try {
@@ -64,4 +67,19 @@ export function bringToFront(title: string, body: string): void {
 /** Whether the app has Do Not Disturb policy access */
 export function hasDndAccess(): boolean {
   try { return LoudAlarm?.hasDndAccess() ?? false; } catch { return false; }
+}
+
+/** Open the system "Do Not Disturb access" settings for this app. */
+export function openDndSettings(): void {
+  try { LoudAlarm?.openDndSettings(); } catch {}
+}
+
+/** Android 14+: whether we're allowed to launch full-screen intents (alarms). */
+export function canUseFullScreenIntent(): boolean {
+  try { return LoudAlarm?.canUseFullScreenIntent() ?? true; } catch { return true; }
+}
+
+/** Open the Android 14+ "full-screen notifications" setting for this app. */
+export function openFullScreenIntentSettings(): void {
+  try { LoudAlarm?.openFullScreenIntentSettings(); } catch {}
 }

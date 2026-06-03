@@ -13,6 +13,7 @@ import { AdMobBanner } from "../../components/admob-banner";
 import { ParentFindPhoneOverlay } from "../../components/parent-find-phone-overlay";
 import { ParentSosOverlay } from "../../components/parent-sos-overlay";
 import { ParentBadWordOverlay } from "../../components/parent-badword-overlay";
+import { ParentTamperOverlay } from "../../components/parent-tamper-overlay";
 import { GameInviteOverlay } from "../../components/game-invite-overlay";
 
 type AuthMethod = "choose" | "pin";
@@ -63,6 +64,7 @@ export default function ParentLayout() {
         <ParentFindPhoneOverlay />
         <ParentSosOverlay />
         <ParentBadWordOverlay />
+        <ParentTamperOverlay />
         <GameInviteOverlay myId="parent" myName={state.parentSettings.name || state.parent.name || "Parent"} />
         <Tabs screenOptions={{
         headerShown: false,

@@ -2021,6 +2021,7 @@ export interface AppState {
   familyAgreements: FamilyAgreement[];
   strangerAlerts: StrangerAlert[];
   badWordAlerts?: BadWordAlert[];
+  tamperAlerts?: TamperAlert[];
   smartScreenTimeRules: SmartScreenTimeRule[];
   // Family Media
   familyMovies: FamilyMovie[];
@@ -2117,6 +2118,18 @@ export interface StrangerAlert {
   detectedAt: string;
   acknowledged: boolean;
   note?: string;
+}
+
+/** Raised when a child turns OFF a protection permission on their device. */
+export type TamperKind = "accessibility" | "overlay" | "usage" | "notif_access" | "battery";
+export interface TamperAlert {
+  id: string;
+  kidId: string;
+  kidName: string;
+  kind: TamperKind;
+  label: string;       // human label of what was disabled
+  detectedAt: string;
+  acknowledged: boolean;
 }
 
 /** A bad word detected in an incoming notification on the kid's device. */
@@ -2633,6 +2646,8 @@ export type AppAction =
   | { type: "STRANGER_ALERT_ACK"; alertId: string }
   | { type: "BADWORD_ALERT_ADD"; alert: BadWordAlert }
   | { type: "BADWORD_ALERT_ACK"; alertId: string }
+  | { type: "TAMPER_ALERT_ADD"; alert: TamperAlert }
+  | { type: "TAMPER_ALERT_ACK"; alertId: string }
   | { type: "STRANGER_ALERT_CLEAR_ALL" }
   // Feature 17: Smart Screen Time Rules
   | { type: "SMART_RULE_ADD"; rule: SmartScreenTimeRule }
