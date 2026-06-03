@@ -69,3 +69,8 @@ android/app/src/main/assets/*.bundle
 # Release keystore — NEVER commit; store securely offline
 android/app/spinini-release.keystore
 android/app/*.keystore
+
+# Firebase secrets — do NOT commit (FCM key + admin service account)
+android/app/google-services.json
+**/*firebase-adminsdk*.json
+**/service-account*.json
