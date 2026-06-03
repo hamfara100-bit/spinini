@@ -11,6 +11,7 @@ import { DurationPicker, DurationMinutes, tomorrowMidnight, minutesUntilMidnight
 import { ScreenContainer } from "../../../components/screen-container";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../../../lib/theme";
 import { Mascot } from "../../../components/mascot";
+import { LOCK_FEATURES } from "../../../lib/lock-features";
 import { PASTEL_COLORS } from "../../../lib/data/types";
 import { uid, nowIso } from "../../../lib/utils";
 
@@ -302,13 +303,22 @@ export default function RemoteLockScreen() {
   const [expandFunLock, setExpandFunLock] = useState<string | null>(null);
   const [expandRemote, setExpandRemote] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ mode: "lock" | "unlock"; kidId: string; kidName: string } | null>(null);
+  const [showAllow, setShowAllow] = useState(false);
+  const [allowFeatures, setAllowFeatures] = useState<string[]>([]);
+  const [allowApps, setAllowApps] = useState<string[]>([]);
+
+  // Every external app the kids have rules for (package → name) — pick which
+  // remain usable during a lock.
+  const allExternalApps = Array.from(
+    new Map(state.kids.flatMap(k => (k.rules.appRules ?? []).map(a => [a.appId, a.appName] as const))).entries()
+  );
 
   function applyLock(kidId: string, kidName: string, mins: DurationMinutes) {
     let until: string | undefined;
     if (mins === -1)      until = tomorrowMidnight();
     else if (mins > 0)    until = new Date(Date.now() + mins * 60000).toISOString();
     else                  until = undefined; // indefinite
-    dispatch({ type: "SET_INSTANT_LOCK", kidId, locked: true, message, until });
+    dispatch({ type: "SET_INSTANT_LOCK", kidId, locked: true, message, until, allowedFeatures: allowFeatures, allowedApps: allowApps });
     dispatch({ type: "SET_FREE_MODE", kidId, enabled: false });
     try {
       const { sendPush } = require("../../../lib/push");
@@ -359,6 +369,46 @@ export default function RemoteLockScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      {/* Focus Lock — allow some things while locked */}
+      <View style={styles.card}>
+        <TouchableOpacity style={styles.allowHeader} onPress={() => setShowAllow(v => !v)}>
+          <Text style={styles.cardTitle}>🎯 Allow during lock {allowFeatures.length + allowApps.length > 0 ? `(${allowFeatures.length + allowApps.length})` : ""}</Text>
+          <Text style={{ color: Colors.textSecondary, fontSize: 18 }}>{showAllow ? "▲" : "▼"}</Text>
+        </TouchableOpacity>
+        {showAllow && (
+          <>
+            <Text style={styles.allowHint}>Locked, but these stay usable — e.g. let them keep drawing.</Text>
+            <Text style={styles.allowSub}>In Spinini</Text>
+            <View style={styles.allowChips}>
+              {LOCK_FEATURES.map(f => {
+                const on = allowFeatures.includes(f.key);
+                return (
+                  <TouchableOpacity key={f.key} style={[styles.allowChip, on && styles.allowChipOn]} onPress={() => setAllowFeatures(s => on ? s.filter(x => x !== f.key) : [...s, f.key])}>
+                    <Text style={[styles.allowChipText, on && { color: "#fff" }]}>{f.emoji} {f.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {allExternalApps.length > 0 && (
+              <>
+                <Text style={styles.allowSub}>Other apps</Text>
+                <View style={styles.allowChips}>
+                  {allExternalApps.map(([pkg, name]) => {
+                    const on = allowApps.includes(pkg);
+                    return (
+                      <TouchableOpacity key={pkg} style={[styles.allowChip, on && styles.allowChipOn]} onPress={() => setAllowApps(s => on ? s.filter(x => x !== pkg) : [...s, pkg])}>
+                        <Text style={[styles.allowChipText, on && { color: "#fff" }]} numberOfLines={1}>{name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.allowNote}>Other apps need the Accessibility hard-lock active on the child's device.</Text>
+              </>
+            )}
+          </>
+        )}
       </View>
 
       {/* Kids */}
@@ -460,6 +510,14 @@ const styles = StyleSheet.create({
   durBtnActive: { backgroundColor: Colors.primary },
   durBtnText: { fontWeight: "600", color: Colors.textSecondary },
   durBtnTextActive: { color: "#fff" },
+  allowHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  allowHint: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: 8 },
+  allowSub: { fontSize: FontSize.xs, fontWeight: "800", color: Colors.textMuted, marginTop: 8, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
+  allowChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  allowChip: { backgroundColor: Colors.cardLight, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1.5, borderColor: Colors.border, maxWidth: 200 },
+  allowChipOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  allowChipText: { fontWeight: "700", color: Colors.textSecondary, fontSize: FontSize.sm },
+  allowNote: { fontSize: 11, color: Colors.textMuted, marginTop: 8, fontStyle: "italic" },
   section: { fontSize: FontSize.md, fontWeight: "700", color: Colors.textPrimary, marginBottom: Spacing.sm },
   kidCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: 2, ...Shadow.sm },
   kidName: { fontSize: FontSize.base, fontWeight: "700", color: Colors.textPrimary },

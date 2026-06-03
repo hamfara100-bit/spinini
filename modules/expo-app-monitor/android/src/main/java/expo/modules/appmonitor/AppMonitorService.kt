@@ -29,9 +29,10 @@ class AppMonitorService : AccessibilityService() {
     var monitoredKidId: String = ""
 
     // ── Hard lock (kiosk) mode ──────────────────────────────────────────────
-    // When active, ANY foreground app that isn't us (or essential system UI) is
-    // treated as blocked and the device is yanked straight back to our app.
+    // When active, ANY foreground app that isn't us (or essential system UI, or
+    // an allow-listed app) is treated as blocked and the device is yanked back.
     var lockModeActive: Boolean = false
+    var lockAllowedPackages: Set<String> = emptySet()
 
     // Minimum seconds between social alerts for the same keyword (avoid spam)
     private const val ALERT_COOLDOWN_MS = 30_000L
@@ -131,7 +132,7 @@ class AppMonitorService : AccessibilityService() {
       // else (including the launcher / recents) is immediately bounced back so
       // the child can't use the device. Essential system UI is ignored so we
       // don't fight the status bar / IME.
-      if (lockModeActive && pkg.isNotEmpty() && pkg != packageName && !isSystemUiPackage(pkg)) {
+      if (lockModeActive && pkg.isNotEmpty() && pkg != packageName && !isSystemUiPackage(pkg) && !lockAllowedPackages.contains(pkg)) {
         bringSelfToFront()
         // also report it as blocked so JS can drop the cover overlay
         sendBroadcast(Intent(ACTION_APP_CHANGED).apply {

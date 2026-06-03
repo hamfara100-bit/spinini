@@ -682,7 +682,14 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "SET_INSTANT_LOCK":
       return updateKid(state, action.kidId, k => ({
         ...k,
-        rules: { ...k.rules, instantLocked: action.locked, lockMessage: action.message, lockUntil: action.until },
+        rules: {
+          ...k.rules,
+          instantLocked: action.locked,
+          lockMessage: action.message,
+          lockUntil: action.until,
+          // Allowlist only applies while locked; refresh it on each lock.
+          ...(action.locked ? { lockAllowedApps: action.allowedApps ?? [], lockAllowedFeatures: action.allowedFeatures ?? [] } : {}),
+        },
       }));
     case "SET_DEAD_PHONE":
       return updateKid(state, action.kidId, k => ({

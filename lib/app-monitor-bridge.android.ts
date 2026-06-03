@@ -251,10 +251,11 @@ export async function startAppMonitor() {
  * bounces every other app back to ours and we keep a cover overlay over anything
  * that flashes up in between. Called from the kid lock screen / lock enforcer.
  */
-export function setKioskLock(active: boolean): void {
+export function setKioskLock(active: boolean, allowedPackages?: string[]): void {
   kioskActive = active;
   try {
     AppMonitor.setLockMode(active);
+    AppMonitor.setLockAllowedPackages(active ? (allowedPackages ?? []) : []);
     if (active) {
       // Make sure the receivers are live so the cover overlay can be shown.
       try { AppMonitor.startMonitoring(); } catch {}

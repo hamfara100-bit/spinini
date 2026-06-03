@@ -5,6 +5,7 @@ import { useAudioPlayer } from "expo-audio";
 import { useData, useKid } from "../lib/data/store";
 import { hashPin } from "../lib/utils";
 import { isLocked } from "../lib/data/logic";
+import { LOCK_FEATURES } from "../lib/lock-features";
 import { bringToFront } from "expo-loud-alarm";
 import { setKioskLock } from "../lib/app-monitor-bridge";
 import { PinPad } from "../components/pin-pad";
@@ -36,8 +37,8 @@ export default function LockScreen() {
 
   // Keep the native hard lock in sync with this screen's lock state.
   useEffect(() => {
-    try { setKioskLock(lockedNow); } catch {}
-  }, [lockedNow]);
+    try { setKioskLock(lockedNow, kid?.rules.lockAllowedApps ?? []); } catch {}
+  }, [lockedNow, JSON.stringify(kid?.rules.lockAllowedApps)]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
@@ -151,6 +152,28 @@ export default function LockScreen() {
     </TouchableOpacity>
   ) : null;
 
+  // Allowed-feature buttons — things the parent left open during the lock
+  // (e.g. Drawing). Tapping navigates there; the enforcer keeps the child
+  // contained to these features + the lock screen.
+  const allowedKeys = kid?.rules.lockAllowedFeatures ?? [];
+  const allowedBtns = allowedKeys.length > 0 ? (
+    <View style={styles.allowedWrap}>
+      <Text style={styles.allowedTitle}>✅ You can still use:</Text>
+      <View style={styles.allowedRow}>
+        {LOCK_FEATURES.filter(f => allowedKeys.includes(f.key)).map(f => (
+          <TouchableOpacity
+            key={f.key}
+            style={styles.allowedChip}
+            onPress={() => { if (id) router.push(f.route(id, kid?.profile.name) as any); }}
+          >
+            <Text style={styles.allowedEmoji}>{f.emoji}</Text>
+            <Text style={styles.allowedLabel}>{f.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  ) : null;
+
   // Call family button — always available even when locked
   const callFamilyBtn = (
     <TouchableOpacity
@@ -175,6 +198,7 @@ export default function LockScreen() {
         <View style={styles.funOverlay}>
           <Text style={styles.funMessage}>{message}</Text>
           <Text style={styles.funSub}>Ask a parent to unlock your screen. 🔒</Text>
+          {allowedBtns}
           {quizUnlockBtn}
           {callFamilyBtn}
           <TouchableOpacity style={styles.funBackBtn} onPress={() => { setPinError(""); setShowPinGate(true); }}>
@@ -193,6 +217,7 @@ export default function LockScreen() {
       <Text style={styles.message}>{message}</Text>
       <Text style={styles.sub}>Ask a parent to unlock your screen.</Text>
 
+      {allowedBtns}
       {quizUnlockBtn}
       {callFamilyBtn}
 
@@ -235,6 +260,14 @@ const styles = StyleSheet.create({
   quizEmoji: { fontSize: 36 },
   quizLabel: { fontSize: FontSize.md, fontWeight: "800", color: Colors.primary },
   quizSub:   { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, maxWidth: 200 },
+
+  // Allowed-feature chips
+  allowedWrap: { marginTop: Spacing.xl, alignItems: "center", width: "100%" },
+  allowedTitle: { color: "rgba(255,255,255,0.85)", fontSize: FontSize.sm, fontWeight: "700", marginBottom: 10 },
+  allowedRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10, maxWidth: 360 },
+  allowedChip: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: Radius.full, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.4)", paddingHorizontal: 16, paddingVertical: 12 },
+  allowedEmoji: { fontSize: 20 },
+  allowedLabel: { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
 
   // PIN gate modal
   pinOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: Spacing.lg },

@@ -51,6 +51,11 @@ class ExpoAppMonitorModule : Module() {
       AppMonitorService.lockModeActive = active
     }
 
+    // Apps that remain usable while the hard lock is active (allowlist).
+    Function("setLockAllowedPackages") { packages: List<String> ->
+      AppMonitorService.lockAllowedPackages = packages.toSet()
+    }
+
     // ── Notification (bad-word) monitoring ───────────────────────────────────
     Function("setNotificationScan") { enabled: Boolean ->
       NotificationMonitorService.scanEnabled = enabled

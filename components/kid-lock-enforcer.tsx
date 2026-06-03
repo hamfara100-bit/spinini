@@ -11,15 +11,17 @@
  */
 import { useEffect, useRef } from "react";
 import { AppState, type AppStateStatus } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { useData } from "../lib/data/store";
 import { isLocked } from "../lib/data/logic";
+import { isAllowedLockRoute } from "../lib/lock-features";
 import { bringToFront } from "expo-loud-alarm";
 import { setKioskLock } from "../lib/app-monitor-bridge";
 
 export function KidLockEnforcer({ kidId }: { kidId: string }) {
   const { state } = useData();
   const router = useRouter();
+  const pathname = usePathname();
   const kid = state.kids.find(k => k.profile.id === kidId);
   const locked = !!kid && isLocked(kid) && !kid.rules.freeMode;
   const lockedRef = useRef(locked);
@@ -27,21 +29,31 @@ export function KidLockEnforcer({ kidId }: { kidId: string }) {
   const lastFrontRef = useRef(0);
 
   const lockMsg = kid?.rules.lockMessage || "Your device is locked 🔒";
+  const allowedApps = kid?.rules.lockAllowedApps;
+  const allowedFeatures = kid?.rules.lockAllowedFeatures;
 
-  // Drive the native hard lock (kiosk) on every lock-state change.
+  // Drive the native hard lock (kiosk) on every lock-state change, including the
+  // allow-listed external apps that stay usable while locked.
   useEffect(() => {
-    try { setKioskLock(locked); } catch {}
-  }, [locked]);
+    try { setKioskLock(locked, allowedApps ?? []); } catch {}
+  }, [locked, JSON.stringify(allowedApps)]);
 
-  // On the transition into a locked state, surface the app + lock screen.
+  // On the transition into a locked state, surface the app.
   const wasLocked = useRef(false);
   useEffect(() => {
     if (locked && !wasLocked.current) {
       try { bringToFront("🔒 Device Locked", lockMsg); } catch {}
-      router.replace(`/lock?id=${kidId}` as any);
     }
     wasLocked.current = locked;
   }, [locked, kidId]);
+
+  // While locked, keep the child on the lock screen OR an allowed in-app feature.
+  // If they navigate anywhere else (a normal tab), bounce them back to /lock.
+  useEffect(() => {
+    if (!locked) return;
+    if (isAllowedLockRoute(pathname, allowedFeatures)) return;
+    router.replace(`/lock?id=${kidId}` as any);
+  }, [locked, pathname, JSON.stringify(allowedFeatures), kidId]);
 
   // If the child switches away while locked, pull the app back to the front.
   useEffect(() => {
