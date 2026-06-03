@@ -311,6 +311,7 @@ export const initialState: AppState = {
   setupDone: false,
   deviceRole: null,
   onlineGame: null,
+  gameInvites: [],
   incomingCalls: [],
   parentNotes: [],
   parentTodos: [],
@@ -471,6 +472,7 @@ function reducer(state: AppState, action: AppAction): AppState {
       if (g.players.length >= 2) return state;
       return {
         ...state,
+        gameInvites: (state.gameInvites ?? []).filter(i => i.toId !== action.playerId),
         onlineGame: {
           ...g,
           players: [...g.players, { id: action.playerId, name: action.playerName, seat: 1 }],
@@ -509,7 +511,13 @@ function reducer(state: AppState, action: AppAction): AppState {
       };
     }
     case "OGAME_END":
-      return { ...state, onlineGame: null };
+      return { ...state, onlineGame: null, gameInvites: [] };
+    case "OGAME_INVITE": {
+      const others = (state.gameInvites ?? []).filter(i => i.toId !== action.invite.toId);
+      return { ...state, gameInvites: [...others, action.invite] };
+    }
+    case "OGAME_INVITE_CLEAR":
+      return { ...state, gameInvites: (state.gameInvites ?? []).filter(i => i.toId !== action.toId) };
 
     case "SETUP_COMPLETE":
       return { ...state, setupDone: true };

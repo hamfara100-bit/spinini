@@ -902,6 +902,7 @@ export interface KidNotification {
   soundLevel?: "normal" | "high"; // volume/pattern intensity
   forceVibrate?: boolean;       // loop vibration pattern
   acknowledged?: boolean;       // kid has tapped "I got it"
+  requestLocation?: boolean;    // alarm asks the kid to SEND their location to stop it
 }
 
 // ─── Fitness & Meal Plans ────────────────────────────────────────────────────
@@ -2023,6 +2024,22 @@ export interface AppState {
   /** Active cross-device (online) Game Night match. Synced to all family
    *  devices so two people on DIFFERENT phones can play the same board. */
   onlineGame?: OnlineGameSession | null;
+
+  /** Pending Game Night invites. Each targets one family member (kid or parent)
+   *  who gets a loud "join the game" alarm on their device until they join or
+   *  dismiss. Synced so the alarm reaches the other phone. */
+  gameInvites?: OnlineGameInvite[];
+}
+
+export interface OnlineGameInvite {
+  id: string;
+  toId: string;        // "parent" or a kid profile id — who should join
+  toName: string;
+  fromId: string;
+  fromName: string;
+  gameId: OnlineGameId;
+  gameName: string;
+  createdAt: string;
 }
 
 // ─── Online (cross-device) Game Night ────────────────────────────────────────
@@ -2161,6 +2178,8 @@ export type AppAction =
   | { type: "OGAME_MOVE"; seat: 0 | 1; move: any }   // move shape varies per game (see ogApply)
   | { type: "OGAME_RESET" }
   | { type: "OGAME_END" }
+  | { type: "OGAME_INVITE"; invite: OnlineGameInvite }
+  | { type: "OGAME_INVITE_CLEAR"; toId: string }
   // Setup
   | { type: "SETUP_COMPLETE" }
   | { type: "SET_DEVICE_ROLE"; role: "parent" | "kid" }

@@ -7,6 +7,7 @@ import * as Notifications from "expo-notifications";
 import { Colors } from "../../../lib/theme";
 import { AlarmOverlay } from "../../../components/alarm-overlay";
 import { LockdownOverlay } from "../../../components/lockdown-overlay";
+import { GameInviteOverlay } from "../../../components/game-invite-overlay";
 import { useData } from "../../../lib/data/store";
 import { notificationFeature } from "../../../lib/data/badges";
 
@@ -163,6 +164,8 @@ const tabStyles = StyleSheet.create({
 
 export default function KidLayout() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { state: kidLayoutState } = useData();
+  const kidName = kidLayoutState.kids.find(k => k.profile.id === id)?.profile.name ?? "Me";
 
   return (
     <View style={{ flex: 1 }}>
@@ -225,6 +228,9 @@ export default function KidLayout() {
 
       {/* Full-screen alarm overlay — mounts above tabs when parent sends an alarm ping */}
       {id && <AlarmOverlay kidId={id} />}
+
+      {/* Game Night invite — loud alarm + Join when a family member invites this kid */}
+      {id && <GameInviteOverlay myId={id} myName={kidName} />}
 
       {/* Remote lockdown countdown — warning popup + floating timer, then auto-lock */}
       {id && <LockdownOverlay kidId={id} />}

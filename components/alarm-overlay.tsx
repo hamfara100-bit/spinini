@@ -14,6 +14,7 @@ import {
   Modal, View, Text, TouchableOpacity, StyleSheet,
   Animated, Vibration, Platform,
 } from "react-native";
+import * as Location from "expo-location";
 import { useData } from "../lib/data/store";
 import type { KidNotification } from "../lib/data/types";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../lib/theme";
@@ -235,12 +236,34 @@ export function AlarmOverlay({ kidId }: Props) {
     };
   }, [alarm?.id]);
 
+  const [sendingLoc, setSendingLoc] = useState(false);
+
   function acknowledge() {
     if (!alarm) return;
     Vibration.cancel();
     stopSoundRef.current?.();
     if (Platform.OS === "android") cancelFullScreenAlarm();
     dispatch({ type: "NOTIFICATION_ACKNOWLEDGE", kidId, notifId: alarm.id });
+  }
+
+  // Location-check alarm: grab the kid's current position, send it to the parent
+  // (it syncs via LOCATION_UPDATE), then stop the alarm.
+  async function sendLocationAndAck() {
+    if (!alarm || sendingLoc) return;
+    setSendingLoc(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        dispatch({
+          type: "LOCATION_UPDATE",
+          kidId,
+          location: { lat: loc.coords.latitude, lng: loc.coords.longitude, accuracy: loc.coords.accuracy ?? undefined, timestamp: new Date().toISOString() },
+        });
+      }
+    } catch {}
+    setSendingLoc(false);
+    acknowledge();
   }
 
   if (!alarm) return null;
@@ -272,7 +295,7 @@ export function AlarmOverlay({ kidId }: Props) {
         {/* Level badge */}
         <View style={[s.levelBadge, { backgroundColor: accentColor + "30", borderColor: accentColor + "60" }]}>
           <Text style={[s.levelText, { color: accentColor }]}>
-            {isHigh ? "🔊 LOUD ALARM — CANNOT BE SILENCED" : "🔔 PARENT PING"}
+            {alarm.requestLocation ? "📍 LOCATION CHECK — PLEASE RESPOND" : isHigh ? "🔊 LOUD ALARM — CANNOT BE SILENCED" : "🔔 PARENT PING"}
           </Text>
         </View>
 
@@ -301,12 +324,20 @@ export function AlarmOverlay({ kidId }: Props) {
         {/* Timer */}
         <Text style={s.elapsed}>{mins}:{secs}</Text>
 
-        {/* Acknowledge */}
-        <TouchableOpacity style={s.ackBtn} onPress={acknowledge} activeOpacity={0.85}>
-          <Text style={s.ackBtnText}>✅ I Got It!</Text>
-        </TouchableOpacity>
+        {/* Acknowledge — location-check alarms must SEND location to stop. */}
+        {alarm.requestLocation ? (
+          <TouchableOpacity style={[s.ackBtn, { backgroundColor: Colors.primary }]} onPress={sendLocationAndAck} activeOpacity={0.85} disabled={sendingLoc}>
+            <Text style={s.ackBtnText}>{sendingLoc ? "📡 Sending…" : "📍 Send My Location"}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={s.ackBtn} onPress={acknowledge} activeOpacity={0.85}>
+            <Text style={s.ackBtnText}>✅ I Got It!</Text>
+          </TouchableOpacity>
+        )}
 
-        <Text style={s.hint}>Tap the button to stop the alarm</Text>
+        <Text style={s.hint}>
+          {alarm.requestLocation ? "Send your location to let your parent know you're safe" : "Tap the button to stop the alarm"}
+        </Text>
       </Animated.View>
     </Modal>
   );

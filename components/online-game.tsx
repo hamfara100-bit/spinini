@@ -129,19 +129,8 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
       updatedAt: nowIso(),
     };
     dispatch({ type: "OGAME_CREATE", session });
-    // Invite the other family kids with a tappable notification.
-    state.kids.filter(k => k.profile.id !== me).forEach(k => {
-      dispatch({
-        type: "NOTIFICATION_ADD",
-        kidId: k.profile.id,
-        notification: {
-          id: uid(), kidId: k.profile.id, kind: "ping",
-          title: "🎮 Game Night invite!",
-          body: `${meName} wants to play ${gameMeta(gameId).name} with you!`,
-          emoji: "🎮", read: false, createdAt: nowIso(), route: "online-game",
-        },
-      });
-    });
+    // Invitations are now explicit — the host picks who to ring from the lobby
+    // (each sends a loud "join the game" alarm to that family member's device).
   }
 
   function endGame() {
@@ -215,9 +204,39 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
             {`Waiting for ${g.players[0]?.name} to start…`}
           </Text></View>
         )}
-        {amHost && g.players.length < 2 && (
-          <Text style={s.hintLine}>Invite sent to the family — someone can join from their Game Night, or just play solo.</Text>
-        )}
+        {/* Ring a specific family member to join — loud alarm on their device. */}
+        {amHost && g.players.length < 2 && (() => {
+          const members = [
+            { id: "parent", name: state.parentSettings.name || state.parent.name || "Parent" },
+            ...state.kids.map(k => ({ id: k.profile.id, name: k.profile.name })),
+          ].filter(m => m.id !== me && !g.players.some(p => p.id === m.id));
+          if (members.length === 0) return null;
+          return (
+            <View style={s.inviteBox}>
+              <Text style={s.inviteTitle}>🔔 Send a join alarm to:</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+                {members.map(m => {
+                  const pending = (state.gameInvites ?? []).some(i => i.toId === m.id);
+                  return (
+                    <TouchableOpacity
+                      key={m.id}
+                      style={[s.inviteChip, pending && s.inviteChipSent]}
+                      onPress={() => dispatch({
+                        type: "OGAME_INVITE",
+                        invite: { id: uid(), toId: m.id, toName: m.name, fromId: me, fromName: meName, gameId: g.gameId, gameName: meta.name, createdAt: nowIso() },
+                      })}
+                    >
+                      <Text style={[s.inviteChipText, pending && { color: "#fff" }]}>
+                        {pending ? `🔔 ${m.name} — ring again` : `${m.id === "parent" ? "👤" : "🧒"} Invite ${m.name}`}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={s.hintLine}>They'll get a loud alarm to join — or just press Start to play solo.</Text>
+            </View>
+          );
+        })()}
 
         <TouchableOpacity style={s.exitBtn} onPress={endGame}><Text style={s.exitText}>✕ Cancel match</Text></TouchableOpacity>
       </View>
@@ -569,6 +588,11 @@ const s = StyleSheet.create({
   hintLine: { color: "#8b85b0", fontSize: 12, textAlign: "center", marginTop: 10, maxWidth: 380, lineHeight: 17 },
   exitBtn: { marginTop: 16, padding: 12 },
   exitText: { color: "#8b85b0", fontWeight: "700", fontSize: 15 },
+  inviteBox: { width: "100%", maxWidth: 460, marginTop: 18, alignItems: "center", gap: 10 },
+  inviteTitle: { color: "#d7d2f0", fontWeight: "800", fontSize: 15 },
+  inviteChip: { backgroundColor: "#1c1838", borderRadius: 50, paddingVertical: 10, paddingHorizontal: 16, borderWidth: 1.5, borderColor: "#3531a8" },
+  inviteChipSent: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  inviteChipText: { color: "#d7d2f0", fontWeight: "800", fontSize: 14 },
   header: { flexDirection: "row", gap: 10, width: "100%", maxWidth: 460, marginTop: 8 },
   scorePlayer: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#1c1838", borderRadius: 14, padding: 10, borderWidth: 2, borderColor: "transparent" },
   scoreName: { flex: 1, color: "#fff", fontWeight: "700", fontSize: 13 },

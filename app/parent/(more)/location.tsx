@@ -87,6 +87,34 @@ function SafeZonesTab({ selectedKidId }: { selectedKidId: string }) {
     setZoneName(""); setZoneLat(""); setZoneLng(""); setZoneRadius("200"); setZoneEmoji("🏠"); setShowAdd(false);
   }
 
+  function requestLocationCheck() {
+    if (!kid) return;
+    Alert.alert(
+      "📍 Request Location Check",
+      `${kid.profile.name}'s device will sound a loud non-stop alarm until they tap "Send My Location". You'll get their current position here.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sound Alarm",
+          onPress: () => {
+            dispatch({
+              type: "NOTIFICATION_ADD",
+              kidId: selectedKidId,
+              notification: {
+                id: uid(), kidId: selectedKidId, kind: "ping",
+                title: "📍 Where are you?",
+                body: `${state.parentSettings.name || "Your parent"} wants to know you're safe. Tap to send your location.`,
+                emoji: "📍", read: false, createdAt: nowIso(),
+                alarmMode: true, requestLocation: true, soundLevel: "high", forceVibrate: true,
+              },
+            });
+            Alert.alert("✅ Alarm sent", `${kid.profile.name}'s phone is now ringing. Their location will appear here once they respond.`);
+          },
+        },
+      ],
+    );
+  }
+
   if (!kid) return null;
 
   return (
@@ -122,6 +150,9 @@ function SafeZonesTab({ selectedKidId }: { selectedKidId: string }) {
             <Text style={styles.noLocationSub}>Location updates when {kid.profile.name}'s device is active.</Text>
           </View>
         )}
+        <TouchableOpacity style={styles.checkBtn} onPress={requestLocationCheck}>
+          <Text style={styles.checkBtnText}>🔔 Request Location Check (sound alarm)</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Safe zones */}
@@ -921,6 +952,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: FontSize.base, fontWeight: "700", color: Colors.textPrimary, marginBottom: Spacing.sm },
   mapsBtn: { marginTop: 10, backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: 12, alignItems: "center", ...Shadow.sm },
   mapsBtnText: { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
+  checkBtn: { marginTop: 10, backgroundColor: Colors.error, borderRadius: Radius.full, paddingVertical: 12, alignItems: "center", ...Shadow.sm },
+  checkBtnText: { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
   addressBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.success + "15", borderRadius: Radius.md, padding: Spacing.sm, marginBottom: 10, borderWidth: 1, borderColor: Colors.success + "33" },
   addressIcon: { fontSize: 18 },
   addressText: { flex: 1, fontSize: FontSize.sm, fontWeight: "700", color: Colors.textPrimary, lineHeight: 19 },
