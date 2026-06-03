@@ -155,6 +155,23 @@ function PushRegistrar() {
   return null;
 }
 
+// On a kid device, check in every few minutes so the parent can detect when this
+// phone goes dark (off / force-stopped / uninstalled). No Firebase required —
+// rides the existing sync. Heartbeats stop the moment the device is killed.
+function HeartbeatBridge() {
+  const { state, dispatch } = useData();
+  const kidId = state.deviceRole === "kid" ? state.kids?.[0]?.profile?.id : null;
+  useEffect(() => {
+    if (!kidId) return;
+    const beat = () => dispatch({ type: "DEVICE_HEARTBEAT", kidId, at: new Date().toISOString() });
+    beat();
+    const i = setInterval(beat, 4 * 60 * 1000); // every 4 minutes
+    const sub = RNAppState.addEventListener("change", s => { if (s === "active") beat(); });
+    return () => { clearInterval(i); sub.remove(); };
+  }, [kidId]);
+  return null;
+}
+
 /**
  * Fires a notification + beep + vibration whenever a new family chat message
  * arrives from someone else AND you're not currently looking at the chat. Runs
@@ -487,6 +504,7 @@ export default function RootLayout() {
                 <BackgroundBridge />
                 <NotificationSetup />
                 <PushRegistrar />
+                <HeartbeatBridge />
                 <AppOpenAdBridge />
                 <SchedulerBridge />
                 <ChatNotifier />

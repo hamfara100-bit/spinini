@@ -14,6 +14,7 @@ import { ParentFindPhoneOverlay } from "../../components/parent-find-phone-overl
 import { ParentSosOverlay } from "../../components/parent-sos-overlay";
 import { ParentBadWordOverlay } from "../../components/parent-badword-overlay";
 import { ParentTamperOverlay } from "../../components/parent-tamper-overlay";
+import { ParentOfflineWatcher } from "../../components/parent-offline-watcher";
 import { GameInviteOverlay } from "../../components/game-invite-overlay";
 
 type AuthMethod = "choose" | "pin";
@@ -65,6 +66,7 @@ export default function ParentLayout() {
         <ParentSosOverlay />
         <ParentBadWordOverlay />
         <ParentTamperOverlay />
+        <ParentOfflineWatcher />
         <GameInviteOverlay myId="parent" myName={state.parentSettings.name || state.parent.name || "Parent"} />
         <Tabs screenOptions={{
         headerShown: false,

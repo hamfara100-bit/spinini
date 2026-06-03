@@ -1725,6 +1725,8 @@ export interface MedFriend {
 export interface KidState {
   profile: KidProfile;
   rules: KidRules;
+  /** Last time this kid's device checked in (ISO). Used for offline detection. */
+  lastSeen?: string;
   usage: UsageDay[];
   bank: BankEntry[];
   timer: TimerSessionState;
@@ -2650,6 +2652,7 @@ export type AppAction =
   | { type: "BADWORD_ALERT_ACK"; alertId: string }
   | { type: "TAMPER_ALERT_ADD"; alert: TamperAlert }
   | { type: "TAMPER_ALERT_ACK"; alertId: string }
+  | { type: "DEVICE_HEARTBEAT"; kidId: string; at: string }
   | { type: "STRANGER_ALERT_CLEAR_ALL" }
   // Feature 17: Smart Screen Time Rules
   | { type: "SMART_RULE_ADD"; rule: SmartScreenTimeRule }

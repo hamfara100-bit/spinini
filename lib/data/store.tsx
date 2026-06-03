@@ -2380,6 +2380,9 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "TAMPER_ALERT_ACK":
       return { ...state, tamperAlerts: (state.tamperAlerts ?? []).map(a => a.id === action.alertId ? { ...a, acknowledged: true } : a) };
 
+    case "DEVICE_HEARTBEAT":
+      return updateKid(state, action.kidId, k => ({ ...k, lastSeen: action.at }));
+
     // ── Feature 17: Smart Screen Time Rules ───────────────────────────────────
     case "SMART_RULE_ADD":
       return { ...state, smartScreenTimeRules: [...(state.smartScreenTimeRules ?? []), action.rule] };
