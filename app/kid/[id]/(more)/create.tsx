@@ -14,7 +14,7 @@ import { Colors, FontSize, Radius, Spacing, Shadow } from "../../../../lib/theme
 import { uid, nowIso } from "../../../../lib/utils";
 import { uploadMedia, uploadMediaMany } from "../../../../lib/media-upload";
 import { StopMotionStudio } from "../../../../components/stop-motion-studio";
-import { generateColoringSVG } from "../../../../lib/ai";
+import { generateColoringSVG, type DrawSize, type DrawDetail } from "../../../../lib/ai";
 import type { DrawingPath, DrawingSticker, ColoringPage } from "../../../../lib/data/types";
 
 const DRAFT_KEY = (kidId: string) => `@famkids/drawing_draft_${kidId}`;
@@ -822,6 +822,8 @@ const SUGGESTIONS = [
 function ColoringTab({ kidId, pages, dispatch }: { kidId: string; pages: ColoringPage[]; dispatch: any }) {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [size, setSize] = useState<DrawSize>("normal");
+  const [detail, setDetail] = useState<DrawDetail>("normal");
   const [activePage, setActivePage] = useState<ColoringPage | null>(null);
   const { openShare, ShareModal } = useShareToSocial(kidId);
 
@@ -829,7 +831,7 @@ function ColoringTab({ kidId, pages, dispatch }: { kidId: string; pages: Colorin
     if (!prompt.trim()) return;
     setLoading(true);
     try {
-      const svg = await generateColoringSVG(prompt.trim());
+      const svg = await generateColoringSVG(prompt.trim(), { size, detail });
       const page: ColoringPage = {
         id: uid(), kidId, prompt: prompt.trim(),
         outlineSvg: svg, fromParent: false, createdAt: nowIso(), paths: [],
@@ -872,6 +874,29 @@ function ColoringTab({ kidId, pages, dispatch }: { kidId: string; pages: Colorin
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        {/* Size */}
+        <Text style={styles.optLabel}>Size</Text>
+        <View style={styles.optRow}>
+          {([["normal","Normal"],["big","Big"],["bigger","Bigger"],["full","Full screen"]] as [DrawSize, string][]).map(([k, lbl]) => (
+            <TouchableOpacity key={k} style={[styles.optChip, size === k && styles.optChipOn]} onPress={() => setSize(k)}>
+              <Text style={[styles.optChipText, size === k && { color: "#fff" }]}>{lbl}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Detail */}
+        <Text style={styles.optLabel}>Detail</Text>
+        <View style={styles.optRow}>
+          {([["normal","Normal"],["detailed","More detailed"],["realistic","Realistic"]] as [DrawDetail, string][]).map(([k, lbl]) => (
+            <TouchableOpacity key={k} style={[styles.optChip, detail === k && styles.optChipOn]} onPress={() => setDetail(k)}>
+              <Text style={[styles.optChipText, detail === k && { color: "#fff" }]}>{lbl}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {detail !== "normal" && (
+          <Text style={styles.optHint}>✨ More detail / realistic looks better but takes longer to draw.</Text>
+        )}
 
         <TouchableOpacity
           style={[styles.genBtn, (loading || !prompt.trim()) && { opacity: 0.6 }]}
@@ -1169,6 +1194,12 @@ const styles = StyleSheet.create({
 
   // Coloring
   coloringSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm, fontWeight: "600" },
+  optLabel: { fontSize: FontSize.xs, fontWeight: "800", color: Colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 10, marginBottom: 6 },
+  optRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  optChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: Colors.cardLight, borderWidth: 1.5, borderColor: Colors.border },
+  optChipOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  optChipText: { fontSize: 13, fontWeight: "700", color: Colors.textSecondary },
+  optHint: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 8 },
   coloringInput: {
     borderWidth: 2, borderColor: Colors.border, borderRadius: Radius.lg,
     padding: Spacing.md, fontSize: FontSize.base, minHeight: 72,

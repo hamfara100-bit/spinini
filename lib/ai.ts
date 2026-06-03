@@ -359,7 +359,30 @@ export async function parentAgentQuery(
 
 // ─── Coloring page SVG ────────────────────────────────────────────────────────
 
-export async function generateColoringSVG(subject: string): Promise<string> {
+export type DrawSize = "normal" | "big" | "bigger" | "full";
+export type DrawDetail = "normal" | "detailed" | "realistic";
+
+const DRAW_SIZE_DIMS: Record<DrawSize, [number, number]> = {
+  normal: [400, 500],
+  big:    [560, 700],
+  bigger: [700, 900],
+  full:   [820, 1180],   // portrait, fills a phone screen
+};
+const DRAW_DETAIL_STYLE: Record<DrawDetail, string> = {
+  normal:    "simple large shapes with minimal detail and thick clean outlines",
+  detailed:  "more details, patterns and decorative elements with medium-thickness outlines",
+  realistic: "realistic proportions and fine line-art detail with layered shapes and shading lines",
+};
+// Fewer tokens for "normal" = much faster generation; more for richer styles.
+const DRAW_DETAIL_TOKENS: Record<DrawDetail, number> = { normal: 1100, detailed: 2200, realistic: 3200 };
+
+export async function generateColoringSVG(
+  subject: string,
+  opts?: { size?: DrawSize; detail?: DrawDetail },
+): Promise<string> {
+  const size = opts?.size ?? "normal";
+  const detail = opts?.detail ?? "normal";
+  const [w, h] = DRAW_SIZE_DIMS[size];
   if (SERVER_ENABLED) {
     try {
       const { svg } = await getVanillaClient().image.generateSvg.mutate({ subject });
@@ -370,10 +393,10 @@ export async function generateColoringSVG(subject: string): Promise<string> {
     [
       {
         role: "user",
-        content: `Create a simple SVG coloring page for children about: "${subject}". Rules: viewBox="0 0 400 500" width="400" height="500", white background, black outlines only, stroke-width 3-6, simple large shapes, no text. Return ONLY raw SVG markup starting with <svg.`,
+        content: `Create an SVG coloring page for children about: "${subject}". Style: ${DRAW_DETAIL_STYLE[detail]}. Rules: viewBox="0 0 ${w} ${h}" width="${w}" height="${h}", white background, BLACK outlines only (no fills or colours), no text. Return ONLY raw SVG markup starting with <svg.`,
       },
     ],
-    2048,
+    DRAW_DETAIL_TOKENS[detail],
   );
 }
 
