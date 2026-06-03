@@ -5,6 +5,7 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — Android-only local module, no TS declarations needed
 import { AppMonitor, addAppChangeListener, addSocialAlertListener, addBadWordListener } from "expo-app-monitor";
+import { sendPush } from "./push";
 // @ts-ignore
 import { DeviceLock } from "expo-device-lock";
 // @ts-ignore
@@ -93,6 +94,7 @@ async function checkProtection() {
             acknowledged: false,
           },
         });
+        sendPush({ targetRole: "parent" }, "⚠️ Protection turned off", `${LABELS[key] ?? key} was disabled on ${kid?.profile?.name ?? "a child"}'s phone`, { kind: "tamper" });
       }
     }
   } catch {}
@@ -147,6 +149,8 @@ export async function startAppMonitor() {
             acknowledged: false,
           },
         });
+        // Push so a fully-closed parent app still gets the bad-word alarm.
+        sendPush({ targetRole: "parent" }, `🚨 Bad word (${e.appName ?? "an app"})`, `"${e.word}" — ${e.text || e.title || ""}`, { kind: "badword" });
       });
     }
   } catch {}

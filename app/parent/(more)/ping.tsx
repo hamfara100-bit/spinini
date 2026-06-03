@@ -21,6 +21,10 @@ export default function PingScreen() {
     if (!message.trim()) return;
     selectedKids.forEach(kidId => {
       dispatch({ type: "NOTIFICATION_ADD", kidId, notification: { id: uid(), kidId, kind: "ping", title: "Message from Parent 📩", body: message.trim(), emoji: "🔔", read: false, createdAt: nowIso() } });
+      try {
+        const { sendPush } = require("../../../lib/push");
+        sendPush({ targetOwnerId: kidId }, "📩 Message from Parent", message.trim(), { kind: "ping", kidId });
+      } catch {}
     });
     setSelectedKids([]);
   }

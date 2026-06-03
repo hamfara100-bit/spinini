@@ -221,10 +221,16 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
                     <TouchableOpacity
                       key={m.id}
                       style={[s.inviteChip, pending && s.inviteChipSent]}
-                      onPress={() => dispatch({
-                        type: "OGAME_INVITE",
-                        invite: { id: uid(), toId: m.id, toName: m.name, fromId: me, fromName: meName, gameId: g.gameId, gameName: meta.name, createdAt: nowIso() },
-                      })}
+                      onPress={() => {
+                        dispatch({
+                          type: "OGAME_INVITE",
+                          invite: { id: uid(), toId: m.id, toName: m.name, fromId: me, fromName: meName, gameId: g.gameId, gameName: meta.name, createdAt: nowIso() },
+                        });
+                        try {
+                          const { sendPush } = require("../lib/push");
+                          sendPush({ targetOwnerId: m.id }, "🎮 Game Night invite!", `${meName} wants to play ${meta.name}`, { kind: "game_invite" });
+                        } catch {}
+                      }}
                     >
                       <Text style={[s.inviteChipText, pending && { color: "#fff" }]}>
                         {pending ? `🔔 ${m.name} — ring again` : `${m.id === "parent" ? "👤" : "🧒"} Invite ${m.name}`}

@@ -142,6 +142,19 @@ function AppOpenAdBridge() {
   return null;
 }
 
+// Registers this device's FCM token so other family members can push to it.
+function PushRegistrar() {
+  const { state } = useData();
+  const role = state.deviceRole === "kid" ? "kid" : "parent";
+  const ownerId = role === "kid" ? (state.kids?.[0]?.profile?.id ?? "kid") : "parent";
+  useEffect(() => {
+    if (!state.deviceRole) return; // role not chosen yet
+    const { registerForPush } = require("../lib/push");
+    registerForPush(ownerId, role);
+  }, [state.deviceRole, ownerId, role]);
+  return null;
+}
+
 /**
  * Fires a notification + beep + vibration whenever a new family chat message
  * arrives from someone else AND you're not currently looking at the chat. Runs
@@ -473,6 +486,7 @@ export default function RootLayout() {
               <DataProvider>
                 <BackgroundBridge />
                 <NotificationSetup />
+                <PushRegistrar />
                 <AppOpenAdBridge />
                 <SchedulerBridge />
                 <ChatNotifier />

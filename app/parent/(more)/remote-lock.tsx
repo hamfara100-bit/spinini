@@ -310,6 +310,10 @@ export default function RemoteLockScreen() {
     else                  until = undefined; // indefinite
     dispatch({ type: "SET_INSTANT_LOCK", kidId, locked: true, message, until });
     dispatch({ type: "SET_FREE_MODE", kidId, enabled: false });
+    try {
+      const { sendPush } = require("../../../lib/push");
+      sendPush({ targetOwnerId: kidId }, "🔒 Device Locked", message || "Your device is locked", { kind: "lock", kidId });
+    } catch {}
     setPicker(null);
     const durText = mins === -1 ? "until tomorrow" : mins === 0 ? "indefinitely" : `for ${mins} min`;
     Alert.alert("🔒 Locked!", `${kidName}'s screen is now locked ${durText}.`);
