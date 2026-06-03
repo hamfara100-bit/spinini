@@ -1,8 +1,20 @@
 import React, { useState, useCallback, useEffect } from "react";
 import * as Location from "expo-location";
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ScrollView, Switch,
+  View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ScrollView, Switch, Linking, Platform,
 } from "react-native";
+
+// Open the coordinates in Google Maps (falls back to the web map URL).
+function openInMaps(lat: number, lng: number, label?: string) {
+  const q = label ? `${lat},${lng}(${encodeURIComponent(label)})` : `${lat},${lng}`;
+  const url = Platform.select({
+    ios: `comgooglemaps://?q=${q}`,
+    default: `geo:${lat},${lng}?q=${q}`,
+  })!;
+  Linking.openURL(url).catch(() =>
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`).catch(() => {}),
+  );
+}
 import { useRouter } from "expo-router";
 import { useData } from "../../../lib/data/store";
 import { ScreenContainer } from "../../../components/screen-container";
@@ -96,6 +108,12 @@ function SafeZonesTab({ selectedKidId }: { selectedKidId: string }) {
             </View>
             {kid.lastLocation.accuracy !== undefined && <Text style={styles.accuracy}>± {Math.round(kid.lastLocation.accuracy)}m accuracy</Text>}
             <Text style={styles.timestamp}>🕐 {fmt(kid.lastLocation.timestamp)}</Text>
+            <TouchableOpacity
+              style={styles.mapsBtn}
+              onPress={() => openInMaps(kid.lastLocation!.lat, kid.lastLocation!.lng, `${kid.profile.name}'s location`)}
+            >
+              <Text style={styles.mapsBtnText}>🗺️ Open in Google Maps</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <View style={styles.noLocationBox}>
@@ -165,11 +183,11 @@ function SafeZonesTab({ selectedKidId }: { selectedKidId: string }) {
           return (
             <View key={zone.id} style={styles.zoneCard}>
               <Text style={{ fontSize: 32 }}>{zone.emoji ?? "📍"}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.zoneName}>{zone.name}</Text>
+              <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.7} onPress={() => openInMaps(zone.lat, zone.lng, zone.name)}>
+                <Text style={styles.zoneName}>{zone.name} 🗺️</Text>
                 <Text style={styles.zoneMeta}>{zone.lat.toFixed(4)}, {zone.lng.toFixed(4)} · r={zone.radiusMeters}m</Text>
                 {dist !== null && <Text style={[styles.zoneStatus, { color: inside ? Colors.success : Colors.error }]}>{inside ? `✅ Inside (${Math.round(dist)}m)` : `⚠️ Outside — ${Math.round(dist)}m away`}</Text>}
-              </View>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => Alert.alert("Delete", "Remove this zone?", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => dispatch({ type: "SAFE_ZONE_REMOVE", kidId: selectedKidId, zoneId: zone.id }) }])}>
                 <Text style={{ color: Colors.textSecondary, fontSize: 18, fontWeight: "700" }}>✕</Text>
               </TouchableOpacity>
@@ -901,6 +919,8 @@ const styles = StyleSheet.create({
   tabTextActive: { color: Colors.primary },
   card: { backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: 4, ...Shadow.sm },
   cardTitle: { fontSize: FontSize.base, fontWeight: "700", color: Colors.textPrimary, marginBottom: Spacing.sm },
+  mapsBtn: { marginTop: 10, backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: 12, alignItems: "center", ...Shadow.sm },
+  mapsBtnText: { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
   addressBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.success + "15", borderRadius: Radius.md, padding: Spacing.sm, marginBottom: 10, borderWidth: 1, borderColor: Colors.success + "33" },
   addressIcon: { fontSize: 18 },
   addressText: { flex: 1, fontSize: FontSize.sm, fontWeight: "700", color: Colors.textPrimary, lineHeight: 19 },
