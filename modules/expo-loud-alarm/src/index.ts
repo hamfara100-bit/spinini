@@ -7,6 +7,8 @@ let LoudAlarm: {
   getDefaultAlarmUri: () => string | null;
   playSystemAlarm: () => void;
   stopSystemAlarm: () => void;
+  fireFullScreenAlarm: (title: string, body: string) => void;
+  cancelFullScreenAlarm: () => void;
   hasDndAccess: () => boolean;
 } | null = null;
 
@@ -34,6 +36,19 @@ export function playSystemAlarm(): void {
 /** Stop the system alarm ringtone */
 export function stopSystemAlarm(): void {
   try { LoudAlarm?.stopSystemAlarm(); } catch {}
+}
+
+/**
+ * Bring the app to the FRONT (full-screen intent) and start the looping alarm,
+ * even when the phone is on another app or the screen is off/locked.
+ */
+export function fireFullScreenAlarm(title: string, body: string): void {
+  try { LoudAlarm?.fireFullScreenAlarm(title, body); } catch {}
+}
+
+/** Cancel the full-screen alarm notification and stop the looping alarm. */
+export function cancelFullScreenAlarm(): void {
+  try { LoudAlarm?.cancelFullScreenAlarm(); } catch {}
 }
 
 /** Whether the app has Do Not Disturb policy access */

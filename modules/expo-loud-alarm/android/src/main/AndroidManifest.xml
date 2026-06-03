@@ -3,5 +3,8 @@
   <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
   <!-- Needed to override Do Not Disturb -->
   <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+  <!-- Needed to launch a full-screen alarm activity from the background -->
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
   <application />
 </manifest>

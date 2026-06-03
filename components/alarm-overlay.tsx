@@ -17,7 +17,7 @@ import {
 import { useData } from "../lib/data/store";
 import type { KidNotification } from "../lib/data/types";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../lib/theme";
-import { forceMaxVolume as nativeForceMaxVolume, getDefaultAlarmUri, playSystemAlarm, stopSystemAlarm } from "expo-loud-alarm";
+import { forceMaxVolume as nativeForceMaxVolume, getDefaultAlarmUri, playSystemAlarm, stopSystemAlarm, fireFullScreenAlarm, cancelFullScreenAlarm } from "expo-loud-alarm";
 
 // Vibration patterns (ms): [wait, vibrate, pause, ...]
 const PATTERN_NORMAL: number[] = [0, 400, 200, 400, 200, 400];
@@ -158,6 +158,7 @@ export function AlarmOverlay({ kidId }: Props) {
       Vibration.cancel();
       stopSoundRef.current?.();
       stopSoundRef.current = null;
+      if (Platform.OS === "android") cancelFullScreenAlarm();
       if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
       setElapsed(0);
       shakeAnim.setValue(0);
@@ -170,6 +171,17 @@ export function AlarmOverlay({ kidId }: Props) {
 
     // Force-unmute Android for high-level alarms
     if (isHigh) forceMaxVolume();
+
+    // BRING THE APP TO THE FRONT even if the kid is in another app or the
+    // screen is off/locked. Fires a full-screen-intent notification that
+    // launches our activity, and starts the looping alarm natively. The Modal
+    // below then renders on top once the activity is foregrounded.
+    if (Platform.OS === "android") {
+      fireFullScreenAlarm(
+        isHigh ? "🚨 URGENT — Mom & Dad need you!" : "🔔 Parent Ping",
+        alarm.body || "Open Spinini now",
+      );
+    }
 
     // Vibration
     if (alarm.forceVibrate !== false) {
@@ -214,6 +226,7 @@ export function AlarmOverlay({ kidId }: Props) {
       Vibration.cancel();
       stopSoundRef.current?.();
       stopSoundRef.current = null;
+      if (Platform.OS === "android") cancelFullScreenAlarm();
       if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
       shakeLoop.stop();
       flashLoop?.stop();
@@ -226,6 +239,7 @@ export function AlarmOverlay({ kidId }: Props) {
     if (!alarm) return;
     Vibration.cancel();
     stopSoundRef.current?.();
+    if (Platform.OS === "android") cancelFullScreenAlarm();
     dispatch({ type: "NOTIFICATION_ACKNOWLEDGE", kidId, notifId: alarm.id });
   }
 
