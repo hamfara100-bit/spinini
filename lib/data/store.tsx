@@ -327,6 +327,7 @@ export const initialState: AppState = {
   medFriends: [],
   familyAgreements: [],
   strangerAlerts: [],
+  badWordAlerts: [],
   smartScreenTimeRules: [],
   familyMovies: [],
   familyMusic: [],
@@ -2346,6 +2347,19 @@ function reducer(state: AppState, action: AppAction): AppState {
     case "STRANGER_ALERT_CLEAR_ALL":
       return { ...state, strangerAlerts: [] };
 
+    case "BADWORD_ALERT_ADD": {
+      // de-dupe: same kid+app+word within 30s is one alert
+      const recent = (state.badWordAlerts ?? []).some(a =>
+        a.kidId === action.alert.kidId && a.appPackage === action.alert.appPackage &&
+        a.word === action.alert.word &&
+        Math.abs(new Date(a.detectedAt).getTime() - new Date(action.alert.detectedAt).getTime()) < 30_000
+      );
+      if (recent) return state;
+      return { ...state, badWordAlerts: [action.alert, ...(state.badWordAlerts ?? [])].slice(0, 100) };
+    }
+    case "BADWORD_ALERT_ACK":
+      return { ...state, badWordAlerts: (state.badWordAlerts ?? []).map(a => a.id === action.alertId ? { ...a, acknowledged: true } : a) };
+
     // ── Feature 17: Smart Screen Time Rules ───────────────────────────────────
     case "SMART_RULE_ADD":
       return { ...state, smartScreenTimeRules: [...(state.smartScreenTimeRules ?? []), action.rule] };
@@ -2429,6 +2443,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             aiResults: saved.aiResults ?? [],
             familyAgreements: saved.familyAgreements ?? [],
             strangerAlerts: saved.strangerAlerts ?? [],
+            badWordAlerts: saved.badWordAlerts ?? [],
             smartScreenTimeRules: saved.smartScreenTimeRules ?? [],
             kids: (saved.kids ?? []).map(k => ({
               ...newKidState(k.profile),

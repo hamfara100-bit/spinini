@@ -15,6 +15,14 @@ export interface SocialAlertEvent {
   context: string;
 }
 
+export interface BadWordEvent {
+  packageName: string;
+  appName: string;
+  title: string;
+  text: string;
+  word: string;
+}
+
 export interface UnknownContactEvent {
   type: "call" | "text";
   number: string;
@@ -31,6 +39,9 @@ interface ExpoAppMonitorModule extends NativeModule {
   setStudyModeActive(active: boolean): void;
   setLockMode(active: boolean): void;
   setSocialMonitoring(enabled: boolean, kidId: string): void;
+  setNotificationScan(enabled: boolean): void;
+  isNotificationAccessEnabled(): boolean;
+  openNotificationAccessSettings(): void;
   getCurrentPackage(): string;
   startMonitoring(): void;
   stopMonitoring(): void;
@@ -53,6 +64,9 @@ const stub = {
   setStudyModeActive: () => {},
   setLockMode: () => {},
   setSocialMonitoring: () => {},
+  setNotificationScan: () => {},
+  isNotificationAccessEnabled: () => false,
+  openNotificationAccessSettings: () => {},
   getCurrentPackage: () => "",
   startMonitoring: () => {},
   stopMonitoring: () => {},
@@ -71,6 +85,12 @@ export function addSocialAlertListener(cb: (e: SocialAlertEvent) => void) {
   if (!mod) return { remove: () => {} };
   // @ts-ignore
   return (mod as any).addListener?.("onSocialAlert", cb) ?? { remove: () => {} };
+}
+
+export function addBadWordListener(cb: (e: BadWordEvent) => void) {
+  if (!mod) return { remove: () => {} };
+  // @ts-ignore
+  return (mod as any).addListener?.("onBadWord", cb) ?? { remove: () => {} };
 }
 
 export default AppMonitor;

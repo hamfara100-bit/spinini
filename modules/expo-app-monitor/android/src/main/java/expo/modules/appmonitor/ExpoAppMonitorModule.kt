@@ -17,11 +17,12 @@ class ExpoAppMonitorModule : Module() {
   private val context get() = requireNotNull(appContext.reactContext)
   private var appChangeReceiver: BroadcastReceiver? = null
   private var socialAlertReceiver: BroadcastReceiver? = null
+  private var badWordReceiver: BroadcastReceiver? = null
 
   override fun definition() = ModuleDefinition {
     Name("ExpoAppMonitor")
 
-    Events("onAppChange", "onSocialAlert")
+    Events("onAppChange", "onSocialAlert", "onBadWord")
 
     // ── Accessibility helpers ────────────────────────────────────────────────
     Function("isAccessibilityEnabled") { isAccessibilityEnabled() }
@@ -48,6 +49,27 @@ class ExpoAppMonitorModule : Module() {
     // Hard lock (kiosk): when active, every app except ours is bounced back.
     Function("setLockMode") { active: Boolean ->
       AppMonitorService.lockModeActive = active
+    }
+
+    // ── Notification (bad-word) monitoring ───────────────────────────────────
+    Function("setNotificationScan") { enabled: Boolean ->
+      NotificationMonitorService.scanEnabled = enabled
+    }
+
+    /** True if the user has granted "Notification access" to our listener. */
+    Function("isNotificationAccessEnabled") {
+      val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: ""
+      val cmp = "${context.packageName}/${NotificationMonitorService::class.java.name}"
+      flat.split(":").any { it.equals(cmp, ignoreCase = true) }
+    }
+
+    Function("openNotificationAccessSettings") {
+      val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").apply {
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+      }
+      try { context.startActivity(intent) } catch (_: Exception) {
+        context.startActivity(Intent(Settings.ACTION_SETTINGS).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK })
+      }
     }
 
     Function("getCurrentPackage") {
@@ -99,6 +121,25 @@ class ExpoAppMonitorModule : Module() {
         registerReceiver(br, filter)
         socialAlertReceiver = br
       }
+
+      // Bad-word notification receiver
+      if (badWordReceiver == null) {
+        val filter = IntentFilter(NotificationMonitorService.ACTION_BAD_WORD)
+        val br = object : BroadcastReceiver() {
+          override fun onReceive(ctx: Context?, intent: Intent?) {
+            if (intent == null) return
+            sendEvent("onBadWord", mapOf(
+              "packageName" to (intent.getStringExtra("packageName") ?: ""),
+              "appName"     to (intent.getStringExtra("appName")     ?: ""),
+              "title"       to (intent.getStringExtra("title")       ?: ""),
+              "text"        to (intent.getStringExtra("text")        ?: ""),
+              "word"        to (intent.getStringExtra("word")        ?: ""),
+            ))
+          }
+        }
+        registerReceiver(br, filter)
+        badWordReceiver = br
+      }
     }
 
     Function("stopMonitoring") {
@@ -106,6 +147,8 @@ class ExpoAppMonitorModule : Module() {
       appChangeReceiver = null
       socialAlertReceiver?.let { try { context.unregisterReceiver(it) } catch (_: Exception) {} }
       socialAlertReceiver = null
+      badWordReceiver?.let { try { context.unregisterReceiver(it) } catch (_: Exception) {} }
+      badWordReceiver = null
     }
 
     // ── Stranger Alert — scan call log + SMS for unknown numbers ────────────
@@ -195,6 +238,8 @@ class ExpoAppMonitorModule : Module() {
       appChangeReceiver = null
       socialAlertReceiver?.let { try { context.unregisterReceiver(it) } catch (_: Exception) {} }
       socialAlertReceiver = null
+      badWordReceiver?.let { try { context.unregisterReceiver(it) } catch (_: Exception) {} }
+      badWordReceiver = null
     }
   }
 

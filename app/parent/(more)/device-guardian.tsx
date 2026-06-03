@@ -57,6 +57,7 @@ export default function DeviceGuardianScreen() {
   });
   const [customDomain, setCustomDomain] = useState("");
   const [mdmUrl, setMdmUrl] = useState("");
+  const [notifAccess, setNotifAccess] = useState(false);
 
   const isNativeAvailable = Platform.OS !== "web";
 
@@ -71,6 +72,10 @@ export default function DeviceGuardianScreen() {
       setStatus(s);
       setUsage(u.sort((a, b2) => b2.totalMinutes - a.totalMinutes));
       setBlocked(b.sort((a, b2) => new Date(b2.blockedAt).getTime() - new Date(a.blockedAt).getTime()));
+      try {
+        const { AppMonitor } = await import("expo-app-monitor");
+        setNotifAccess(AppMonitor.isNotificationAccessEnabled());
+      } catch {}
     } catch {
       // no-op on Expo Go
     } finally {
@@ -195,6 +200,20 @@ export default function DeviceGuardianScreen() {
                     refresh();
                   }}
                   howTo="Settings → Accessibility → Downloaded Apps → FamilyGuard → enable"
+                />
+
+                <PermRow
+                  emoji="🔔"
+                  label="Notification Access (bad-word alarm)"
+                  sub="Scan incoming notifications for bad words & alarm the parent"
+                  active={notifAccess}
+                  onEnable={async () => {
+                    try {
+                      const { AppMonitor } = await import("expo-app-monitor");
+                      AppMonitor.openNotificationAccessSettings();
+                    } catch {}
+                  }}
+                  howTo="Settings → Notifications → Notification access / Device & app notifications → enable Spinini"
                 />
 
                 <PermRow

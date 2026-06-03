@@ -2020,6 +2020,7 @@ export interface AppState {
   // Features 15-17
   familyAgreements: FamilyAgreement[];
   strangerAlerts: StrangerAlert[];
+  badWordAlerts?: BadWordAlert[];
   smartScreenTimeRules: SmartScreenTimeRule[];
   // Family Media
   familyMovies: FamilyMovie[];
@@ -2116,6 +2117,20 @@ export interface StrangerAlert {
   detectedAt: string;
   acknowledged: boolean;
   note?: string;
+}
+
+/** A bad word detected in an incoming notification on the kid's device. */
+export interface BadWordAlert {
+  id: string;
+  kidId: string;
+  kidName: string;
+  appPackage: string;
+  appName: string;     // the app that sent the notification
+  title: string;       // notification title
+  text: string;        // notification body
+  word: string;        // the matched bad word
+  detectedAt: string;
+  acknowledged: boolean;
 }
 
 // ─── Feature 17: Smart / Context-Aware Screen Time ────────────────────────────
@@ -2616,6 +2631,8 @@ export type AppAction =
   // Feature 16: Stranger Alerts
   | { type: "STRANGER_ALERT_ADD"; alert: StrangerAlert }
   | { type: "STRANGER_ALERT_ACK"; alertId: string }
+  | { type: "BADWORD_ALERT_ADD"; alert: BadWordAlert }
+  | { type: "BADWORD_ALERT_ACK"; alertId: string }
   | { type: "STRANGER_ALERT_CLEAR_ALL" }
   // Feature 17: Smart Screen Time Rules
   | { type: "SMART_RULE_ADD"; rule: SmartScreenTimeRule }

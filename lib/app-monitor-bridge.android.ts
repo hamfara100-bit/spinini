@@ -4,7 +4,7 @@
  */
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — Android-only local module, no TS declarations needed
-import { AppMonitor, addAppChangeListener, addSocialAlertListener } from "expo-app-monitor";
+import { AppMonitor, addAppChangeListener, addSocialAlertListener, addBadWordListener } from "expo-app-monitor";
 // @ts-ignore
 import { DeviceLock } from "expo-device-lock";
 // @ts-ignore
@@ -39,6 +39,7 @@ const STRANGER_SEEN_KEY = "@famkids/stranger-seen"; // tracks already-reported (
 
 let subscription: { remove: () => void } | null = null;
 let socialSubscription: { remove: () => void } | null = null;
+let badWordSubscription: { remove: () => void } | null = null;
 let usageInterval: ReturnType<typeof setInterval> | null = null;
 let strangerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -56,6 +57,39 @@ export async function startAppMonitor() {
   if (strangerInterval) clearInterval(strangerInterval);
   strangerInterval = setInterval(checkStrangerAlerts, 5 * 60 * 1000);
   await checkStrangerAlerts();
+
+  // ── Bad-word notification monitoring (independent of accessibility) ───────
+  // Reads incoming notifications and, when one contains a bad word, queues a
+  // synced BADWORD_ALERT so the PARENT device raises a loud alarm.
+  try {
+    const st0 = await getState();
+    const isKidDevice = st0?.deviceRole === "kid" || (st0?.deviceRole == null && (st0?.kids?.length ?? 0) > 0);
+    if (isKidDevice && AppMonitor.isNotificationAccessEnabled()) {
+      AppMonitor.setNotificationScan(true);
+      AppMonitor.startMonitoring(); // ensure broadcast receivers are live
+      badWordSubscription?.remove();
+      badWordSubscription = addBadWordListener(async (e: any) => {
+        const st = await getState();
+        const kid = st?.kids?.[0];
+        const { uid } = await import("./utils");
+        await pushEvent({
+          type: "BADWORD_ALERT_ADD",
+          alert: {
+            id: uid(),
+            kidId: kid?.profile?.id ?? "",
+            kidName: kid?.profile?.name ?? "your child",
+            appPackage: e.packageName ?? "",
+            appName: e.appName ?? "an app",
+            title: e.title ?? "",
+            text: e.text ?? "",
+            word: e.word ?? "",
+            detectedAt: new Date().toISOString(),
+            acknowledged: false,
+          },
+        });
+      });
+    }
+  } catch {}
 
   // ── App change monitoring via AccessibilityService ────────────────────────
   if (!AppMonitor.isAccessibilityEnabled()) return;
@@ -171,6 +205,8 @@ export function stopAppMonitor() {
   subscription = null;
   socialSubscription?.remove();
   socialSubscription = null;
+  badWordSubscription?.remove();
+  badWordSubscription = null;
   if (usageInterval)   { clearInterval(usageInterval);   usageInterval   = null; }
   if (strangerInterval){ clearInterval(strangerInterval); strangerInterval = null; }
   try { AppMonitor.stopMonitoring(); } catch {}

@@ -123,7 +123,10 @@ function BackgroundBridge() {
       }
       appState.current = nextState;
     });
-    return () => { sub.remove(); stopAppMonitor(); };
+    // Periodically drain background events (e.g. bad-word notification alerts)
+    // so they reach the parent promptly even while our app is backgrounded.
+    const flushTimer = setInterval(() => { flushBgEvents(); }, 8000);
+    return () => { sub.remove(); clearInterval(flushTimer); stopAppMonitor(); };
   }, []);
 
   return null;

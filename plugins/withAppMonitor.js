@@ -62,6 +62,24 @@ module.exports = function withAppMonitor(config) {
       app.service = services;
     }
 
+    // ── NotificationListenerService (bad-word notification monitor) ───────────
+    const notifService = "expo.modules.appmonitor.NotificationMonitorService";
+    if (!services.some((s) => s.$?.["android:name"] === notifService)) {
+      services.push({
+        $: {
+          "android:name": notifService,
+          "android:permission": "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
+          "android:exported": "true",
+        },
+        "intent-filter": [
+          {
+            action: [{ $: { "android:name": "android.service.notification.NotificationListenerService" } }],
+          },
+        ],
+      });
+      app.service = services;
+    }
+
     return cfg;
   });
 };
