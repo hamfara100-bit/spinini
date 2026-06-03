@@ -137,6 +137,9 @@ export function DrawingCanvas({
   const dragStickerIdRef = useRef<string | null>(null);
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartSizeRef = useRef<number>(0);
+  // Multi-touch drawing: one in-progress path per finger (keyed by touch id).
+  const drawTouchesRef = useRef<Map<number, string>>(new Map());
+  const [liveStrokes, setLiveStrokes] = useState<string[]>([]);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep refs in sync
@@ -169,6 +172,28 @@ export function DrawingCanvas({
 
   function pushUndo(p = pathsRef.current, s = stickersRef.current) {
     setUndoStack(st => [...st.slice(-20), { paths: [...p], stickers: [...s] }]);
+  }
+
+  // Commit one finished stroke (used for single- AND multi-touch drawing).
+  function commitStroke(snap: string) {
+    if (!snap || !snap.includes("L")) return; // need at least a line segment
+    const isEraser    = toolRef.current === "eraser";
+    const isHighlight = toolRef.current === "highlight";
+    const isSketch    = toolRef.current === "sketch";
+    const newPath: DrawingPath = {
+      points: snap,
+      color: isEraser ? (glowRef.current ? "#090920" : "#FFFFFF") : colorRef.current,
+      width: isEraser ? brushRef.current * 2.5 : isHighlight ? brushRef.current * 3 : brushRef.current,
+      glow: glowRef.current && !isEraser && !isHighlight,
+      highlight: isHighlight,
+      sketch: isSketch && !isEraser,
+    };
+    setPaths(p => {
+      pushUndo(p, stickersRef.current);
+      const next = [...p, newPath];
+      pathsRef.current = next;
+      return next;
+    });
   }
 
   function undo() {
@@ -235,10 +260,10 @@ export function DrawingCanvas({
           return;
         }
 
-        // Start drawing
-        const startPath = `M${x.toFixed(1)},${y.toFixed(1)}`;
-        currentPathRef.current = startPath;
-        setCurrentPath(startPath);
+        // Start drawing this finger (extra fingers are picked up in move).
+        const tid = (e.nativeEvent as any).identifier ?? 0;
+        drawTouchesRef.current.set(tid, `M${x.toFixed(1)},${y.toFixed(1)}`);
+        setLiveStrokes(Array.from(drawTouchesRef.current.values()));
       },
 
       onPanResponderMove: (e) => {
@@ -278,9 +303,23 @@ export function DrawingCanvas({
 
         if (toolRef.current === "sticker") return;
 
-        const updated = `${currentPathRef.current} L${x.toFixed(1)},${y.toFixed(1)}`;
-        currentPathRef.current = updated;
-        setCurrentPath(updated);
+        // ── Multi-touch drawing: one stroke per finger ──
+        const allTouches = e.nativeEvent.touches ?? [];
+        const liveIds = new Set(allTouches.map((t: any) => t.identifier));
+        // A finger that lifted → commit its stroke.
+        drawTouchesRef.current.forEach((p, tid) => {
+          if (!liveIds.has(tid)) { commitStroke(p); drawTouchesRef.current.delete(tid); }
+        });
+        // Extend (or start) each active finger's stroke.
+        for (const t of allTouches as any[]) {
+          const tx = t.locationX, ty = t.locationY;
+          const prev = drawTouchesRef.current.get(t.identifier);
+          drawTouchesRef.current.set(
+            t.identifier,
+            prev ? `${prev} L${tx.toFixed(1)},${ty.toFixed(1)}` : `M${tx.toFixed(1)},${ty.toFixed(1)}`,
+          );
+        }
+        setLiveStrokes(Array.from(drawTouchesRef.current.values()));
       },
 
       onPanResponderRelease: () => {
@@ -291,34 +330,19 @@ export function DrawingCanvas({
         }
         if (toolRef.current === "sticker") return;
 
-        const snap = currentPathRef.current;
-        if (!snap) return;
+        // Commit any in-progress strokes still down (last finger up).
+        drawTouchesRef.current.forEach(p => commitStroke(p));
+        drawTouchesRef.current.clear();
+        setLiveStrokes([]);
+      },
 
-        const isEraser    = toolRef.current === "eraser";
-        const isHighlight = toolRef.current === "highlight";
-        const isSketch    = toolRef.current === "sketch";
-
-        const newPath: DrawingPath = {
-          points: snap,
-          color: isEraser
-            ? (glowRef.current ? "#090920" : "#FFFFFF")
-            : colorRef.current,
-          width: isEraser ? brushRef.current * 2.5
-               : isHighlight ? brushRef.current * 3
-               : brushRef.current,
-          glow: glowRef.current && !isEraser && !isHighlight,
-          highlight: isHighlight,
-          sketch: isSketch && !isEraser,
-        };
-
-        setPaths(p => {
-          pushUndo(p, stickersRef.current);
-          const next = [...p, newPath];
-          pathsRef.current = next;
-          return next;
-        });
-        currentPathRef.current = "";
-        setCurrentPath("");
+      onPanResponderTerminate: () => {
+        // Gesture interrupted — save what we have and reset.
+        pinchStartDistRef.current = null;
+        dragStickerIdRef.current = null;
+        drawTouchesRef.current.forEach(p => commitStroke(p));
+        drawTouchesRef.current.clear();
+        setLiveStrokes([]);
       },
     })
   ).current;
@@ -485,31 +509,31 @@ export function DrawingCanvas({
             )}
             {paths.map((p, i) => renderPath(p, i))}
 
-            {/* Live stroke */}
-            {currentPath ? (
+            {/* Live strokes (one per active finger) */}
+            {liveStrokes.map((cp, i) => (
               tool === "eraser" ? (
-                <Path d={currentPath} stroke={glowMode ? "#090920" : "#FFFFFF"}
+                <Path key={`l${i}`} d={cp} stroke={glowMode ? "#090920" : "#FFFFFF"}
                   strokeWidth={brushSize * 2.5} fill="none" strokeLinecap="round" />
               ) : tool === "highlight" ? (
-                <Path d={currentPath} stroke={color} strokeWidth={brushSize * 3}
+                <Path key={`l${i}`} d={cp} stroke={color} strokeWidth={brushSize * 3}
                   strokeOpacity={0.35} fill="none" strokeLinecap="square" strokeLinejoin="round" />
               ) : tool === "sketch" ? (
-                <>
-                  <Path d={currentPath} stroke={color} strokeWidth={brushSize * 0.8}
+                <React.Fragment key={`l${i}`}>
+                  <Path d={cp} stroke={color} strokeWidth={brushSize * 0.8}
                     strokeOpacity={0.85} fill="none" strokeLinecap="round" strokeDasharray="1,2" />
-                  <Path d={currentPath} stroke={color} strokeWidth={brushSize * 0.4}
+                  <Path d={cp} stroke={color} strokeWidth={brushSize * 0.4}
                     strokeOpacity={0.4} fill="none" strokeLinecap="round" transform="translate(2,1)" />
-                </>
+                </React.Fragment>
               ) : glowMode ? (
-                <>
-                  <Path d={currentPath} stroke={color} strokeWidth={brushSize + 10} strokeOpacity={0.25} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d={currentPath} stroke={color} strokeWidth={brushSize + 4} strokeOpacity={0.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d={currentPath} stroke={color} strokeWidth={brushSize} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                </>
+                <React.Fragment key={`l${i}`}>
+                  <Path d={cp} stroke={color} strokeWidth={brushSize + 10} strokeOpacity={0.25} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d={cp} stroke={color} strokeWidth={brushSize + 4} strokeOpacity={0.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d={cp} stroke={color} strokeWidth={brushSize} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </React.Fragment>
               ) : (
-                <Path d={currentPath} stroke={color} strokeWidth={brushSize} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                <Path key={`l${i}`} d={cp} stroke={color} strokeWidth={brushSize} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               )
-            ) : null}
+            ))}
           </Svg>
 
           {/* ── Sticker / Vehicle layer ── */}
@@ -543,8 +567,10 @@ export function DrawingCanvas({
           {/* ── Selected sticker controls ── */}
           {selObj && (
             <View style={[styles.stickerControlsWrapper, {
+              // Anchor to the sticker CENTRE with a fixed offset (size-independent)
+              // so the +/- buttons don't jump/hide each time you resize.
               left: Math.max(4, selObj.x - 90),
-              top: Math.max(4, selObj.y - selObj.size / 2 - 88),
+              top: Math.max(4, selObj.y - 130),
             }]}>
               {/* Action row */}
               <View style={styles.stickerControls}>
