@@ -373,7 +373,7 @@ function reducer(state: AppState, action: AppAction): AppState {
     }
     case "OGAME_START": {
       const g = state.onlineGame;
-      if (!g || g.players.length < 2) return state;
+      if (!g) return state; // can start solo (1 player) or multiplayer (2)
       return { ...state, onlineGame: { ...g, status: "playing", turn: 0, updatedAt: new Date().toISOString() } };
     }
     case "OGAME_MOVE": {

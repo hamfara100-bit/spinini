@@ -8,7 +8,7 @@
  * `me` is this device's player id ("parent" or a kid profile id).
  */
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, StatusBar } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, StatusBar, Animated } from "react-native";
 import { useData } from "../lib/data/store";
 import { Colors } from "../lib/theme";
 import { uid, nowIso } from "../lib/utils";
@@ -32,6 +32,24 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
   const mySeat = g?.players.find(p => p.id === me)?.seat ?? null;
   const amHost = g?.hostId === me;
   const opponent = g?.players.find(p => p.id !== me);
+
+  // Blink the turn banner while THIS device can act (your turn, or any turn when
+  // playing solo). Declared at top level so hooks run unconditionally.
+  const blink = useRef(new Animated.Value(1)).current;
+  const canActNow =
+    g?.status === "playing" &&
+    (g.players.length === 1 ? g.hostId === me : (mySeat != null && g.turn === mySeat));
+  useEffect(() => {
+    if (canActNow) {
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(blink, { toValue: 0.25, duration: 500, useNativeDriver: true }),
+        Animated.timing(blink, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ]));
+      loop.start();
+      return () => { loop.stop(); blink.setValue(1); };
+    }
+    blink.setValue(1);
+  }, [canActNow]);
 
   // Host awards ⭐ to the winning kid once, when a match finishes.
   useEffect(() => {
@@ -81,9 +99,9 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
   }
 
   function endGame() {
-    Alert.alert("Leave the game?", "This ends the match for everyone.", [
+    Alert.alert("End this game?", "This ends the match and returns to the game list.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Leave", style: "destructive", onPress: () => { dispatch({ type: "OGAME_END" }); onExit(); } },
+      { text: "End game", style: "destructive", onPress: () => dispatch({ type: "OGAME_END" }) },
     ]);
   }
 
@@ -142,14 +160,19 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
           <TouchableOpacity style={s.primaryBtn} onPress={() => dispatch({ type: "OGAME_JOIN", playerId: me, playerName: meName })}>
             <Text style={s.primaryBtnText}>Join {g.players[0]?.name}'s game ✋</Text>
           </TouchableOpacity>
-        ) : amHost && g.players.length >= 2 ? (
+        ) : amHost ? (
+          // Host can Start anytime — solo (play both sides yourself) or wait for
+          // a join to become two-player.
           <TouchableOpacity style={s.primaryBtn} onPress={() => dispatch({ type: "OGAME_START" })}>
-            <Text style={s.primaryBtnText}>▶ Start Game</Text>
+            <Text style={s.primaryBtnText}>{g.players.length >= 2 ? "▶ Start Game" : "▶ Start (play solo)"}</Text>
           </TouchableOpacity>
         ) : (
           <View style={s.waitPill}><Text style={s.waitText}>
-            {amHost ? "Waiting for someone to join…" : g.players.length >= 2 ? `Waiting for ${g.players[0]?.name} to start…` : "Waiting…"}
+            {`Waiting for ${g.players[0]?.name} to start…`}
           </Text></View>
+        )}
+        {amHost && g.players.length < 2 && (
+          <Text style={s.hintLine}>Invite sent to the family — someone can join from their Game Night, or just play solo.</Text>
         )}
 
         <TouchableOpacity style={s.exitBtn} onPress={endGame}><Text style={s.exitText}>✕ Cancel match</Text></TouchableOpacity>
@@ -158,20 +181,27 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
   }
 
   // ── Playing / finished ──────────────────────────────────────────────────────
+  // Solo = only the host is in the match → that one device plays BOTH sides.
+  const isSolo = g.players.length === 1;
   const myTurn = g.status === "playing" && mySeat != null && g.turn === mySeat;
   const turnPlayer = g.players.find(p => p.seat === g.turn);
-  const canPlay = myTurn;
+  // I can act if it's my turn (multiplayer) or always, on the host device (solo).
+  const canPlay = g.status === "playing" && (isSolo ? amHost : myTurn);
+  // In solo we move for whichever seat's turn it is.
+  const moveSeat: 0 | 1 = isSolo ? g.turn : (mySeat ?? 0);
 
   function play(index: number) {
-    if (!canPlay || mySeat == null) return;
-    dispatch({ type: "OGAME_MOVE", seat: mySeat, index });
+    if (!canPlay) return;
+    dispatch({ type: "OGAME_MOVE", seat: moveSeat, index });
   }
 
   const banner = g.status === "finished"
     ? (g.winner === "draw" ? "🤝 It's a draw!"
+        : isSolo ? `${SEAT_MARK[g.winner as 0 | 1]} wins!`
         : g.winner === mySeat ? "🎉 You win!"
         : `${g.players.find(p => p.seat === g.winner)?.name ?? "Opponent"} wins!`)
-    : (myTurn ? "▶ Your turn" : `⏳ ${turnPlayer?.name ?? "Opponent"}'s turn`);
+    : isSolo ? `${SEAT_MARK[g.turn]}'s turn — your move`
+    : (myTurn ? "▶ YOUR TURN" : `⏳ Waiting for ${turnPlayer?.name ?? "opponent"}…`);
 
   return (
     <View style={s.root}>
@@ -187,7 +217,15 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
         ))}
       </View>
 
-      <Text style={[s.banner, g.status === "finished" && { color: Colors.warning }]}>{banner}</Text>
+      <Animated.Text
+        style={[
+          s.banner,
+          g.status === "finished" && { color: Colors.warning },
+          canActNow && { color: Colors.success, opacity: blink },
+        ]}
+      >
+        {banner}
+      </Animated.Text>
 
       {/* Board */}
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -281,6 +319,7 @@ const s = StyleSheet.create({
   primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 17 },
   waitPill: { backgroundColor: "#1c1838", borderRadius: 50, paddingVertical: 14, paddingHorizontal: 24, borderWidth: 1, borderColor: "#2e2a52" },
   waitText: { color: "#b9b3d6", fontWeight: "700", fontSize: 15 },
+  hintLine: { color: "#8b85b0", fontSize: 12, textAlign: "center", marginTop: 12, maxWidth: 380, lineHeight: 17 },
   exitBtn: { marginTop: 20, padding: 12 },
   exitText: { color: "#8b85b0", fontWeight: "700", fontSize: 15 },
   header: { flexDirection: "row", gap: 10, width: "100%", maxWidth: 460, marginTop: 8 },
