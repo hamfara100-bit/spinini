@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   View, StyleSheet, TouchableOpacity, Text, ScrollView,
-  PanResponder, Image, Modal, Dimensions, Alert, ActivityIndicator,
+  PanResponder, Image, Modal, Dimensions, Alert, ActivityIndicator, TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, {
@@ -13,10 +13,11 @@ import ViewShot, { captureRef } from "react-native-view-shot";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import * as MediaLibrary from "expo-media-library";
-import { Colors, Radius, Spacing, FontSize } from "../lib/theme";
+import { Colors, Radius, Spacing, FontSize, Shadow } from "../lib/theme";
 import { DrawingPath, DrawingSticker } from "../lib/data/types";
 import { STICKER_CATEGORIES } from "../lib/stickers";
 import { floodFillImage } from "../lib/flood-fill";
+import { generateColoringSVG } from "../lib/ai";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,10 @@ export function DrawingCanvas({
   const [glowMode, setGlowMode] = useState(detectedGlow);
   const [bgImage, setBgImage] = useState<string | undefined>(initialBgImage);
   const [fillBusy, setFillBusy] = useState(false);
+  const [aiSvg, setAiSvg] = useState<string | undefined>(undefined);
+  const [showAi, setShowAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
   const bgImageRef = useRef<string | undefined>(initialBgImage);
   const canvasSizeRef = useRef<{ w: number; h: number }>({ w: 1, h: 1 });
@@ -197,6 +202,21 @@ export function DrawingCanvas({
       }
     } catch {}
     finally { setFillBusy(false); }
+  }
+
+  // AI "improve": generate a neat line-art version of what the child describes,
+  // shown as a layer behind their strokes so they can trace / colour over it.
+  async function aiImprove() {
+    if (!aiPrompt.trim() || aiBusy) return;
+    setAiBusy(true);
+    try {
+      const raw = await generateColoringSVG(aiPrompt.trim(), { detail: "detailed" });
+      const m = raw.match(/<svg[\s\S]*<\/svg>/i);
+      if (m) { setAiSvg(m[0]); setShowAi(false); setAiPrompt(""); }
+      else Alert.alert("Hmm 🤔", "The AI couldn't draw that. Try describing it differently!");
+    } catch {
+      Alert.alert("Oops", "Couldn't reach the AI. Check your internet and try again.");
+    } finally { setAiBusy(false); }
   }
 
   // Commit one finished stroke (used for single- AND multi-touch drawing).
@@ -290,6 +310,10 @@ export function DrawingCanvas({
             stickersRef.current = next;
             return next;
           });
+          // Grab the freshly placed sticker so the user can immediately DRAG it
+          // or spread TWO fingers to pinch it bigger as they place it.
+          dragStickerIdRef.current = newSticker.id;
+          setSelectedStickerId(newSticker.id);
           return;
         }
 
@@ -530,6 +554,7 @@ export function DrawingCanvas({
 
           {/* AI coloring outline */}
           {backgroundSvg && <SvgXml xml={backgroundSvg} style={StyleSheet.absoluteFill} />}
+          {aiSvg && <SvgXml xml={aiSvg} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style={StyleSheet.absoluteFill} />}
 
           {/* Drawing SVG layer */}
           <Svg style={StyleSheet.absoluteFill}>
@@ -738,6 +763,8 @@ export function DrawingCanvas({
           <View style={styles.actionRow}>
             <ActionBtn icon="↩️" onPress={undo} disabled={!undoStack.length} glow={glowMode} />
             <ActionBtn icon="🗑️" onPress={clearAll} glow={glowMode} />
+            <ActionBtn icon="✨" onPress={() => setShowAi(true)} glow={glowMode} />
+            {aiSvg && <ActionBtn icon="🚫" onPress={() => setAiSvg(undefined)} glow={glowMode} />}
             {bgImage && <ActionBtn icon="❌" onPress={() => { setBgImage(undefined); setPhotoGlow(false); }} glow={glowMode} />}
             <TouchableOpacity onPress={saveToDevice} style={[styles.saveBtn, styles.saveBtnGallery]}>
               <Text style={styles.saveBtnText}>📱 Save</Text>
@@ -750,6 +777,33 @@ export function DrawingCanvas({
           </View>
         </View>
       </View>
+
+      {/* ── AI Improve Modal ── */}
+      <Modal visible={showAi} animationType="slide" transparent onRequestClose={() => !aiBusy && setShowAi(false)}>
+        <View style={aiM.overlay}>
+          <View style={aiM.card}>
+            <Text style={aiM.title}>✨ AI Improve</Text>
+            <Text style={aiM.sub}>Tell the AI what you drew — it'll sketch a neat version behind your art so you can trace or colour it!</Text>
+            <TextInput
+              style={aiM.input}
+              value={aiPrompt}
+              onChangeText={setAiPrompt}
+              placeholder="e.g. a friendly dragon, a race car, a castle…"
+              placeholderTextColor={Colors.textMuted}
+              editable={!aiBusy}
+              multiline
+            />
+            <View style={aiM.btnRow}>
+              <TouchableOpacity style={aiM.cancelBtn} onPress={() => !aiBusy && setShowAi(false)} disabled={aiBusy}>
+                <Text style={aiM.cancelTxt}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[aiM.goBtn, (aiBusy || !aiPrompt.trim()) && { opacity: 0.6 }]} onPress={aiImprove} disabled={aiBusy || !aiPrompt.trim()}>
+                {aiBusy ? <ActivityIndicator color="#fff" /> : <Text style={aiM.goTxt}>✨ Draw it</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Sticker Picker Modal ── */}
       <Modal visible={stickerPickerOpen} animationType="slide" transparent onRequestClose={() => setStickerPickerOpen(false)}>
@@ -1176,6 +1230,19 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 7 },
   saveBtnGallery: { backgroundColor: "#16A34A" },
   saveBtnText: { color: "#fff", fontWeight: "800", fontSize: FontSize.sm },
+});
+
+const aiM = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", padding: Spacing.lg },
+  card: { backgroundColor: Colors.bgLight, borderRadius: Radius.xl, padding: Spacing.lg, gap: 10, ...Shadow.md },
+  title: { fontSize: FontSize.lg, fontWeight: "900", color: Colors.primary, textAlign: "center" },
+  sub: { fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: "center", lineHeight: 19 },
+  input: { borderWidth: 2, borderColor: Colors.border, borderRadius: Radius.lg, padding: Spacing.md, fontSize: FontSize.base, color: Colors.textPrimary, backgroundColor: Colors.surfaceLight, minHeight: 70, textAlignVertical: "top" },
+  btnRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  cancelBtn: { flex: 1, borderWidth: 2, borderColor: Colors.border, borderRadius: Radius.full, alignItems: "center", paddingVertical: 14 },
+  cancelTxt: { fontWeight: "700", color: Colors.textSecondary, fontSize: FontSize.base },
+  goBtn: { flex: 2, backgroundColor: Colors.primary, borderRadius: Radius.full, alignItems: "center", justifyContent: "center", paddingVertical: 14 },
+  goTxt: { color: "#fff", fontWeight: "800", fontSize: FontSize.base },
 });
 
 const modal = StyleSheet.create({
