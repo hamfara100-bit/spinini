@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   View, StyleSheet, TouchableOpacity, Text, ScrollView,
-  PanResponder, Image, Modal, Dimensions, Alert,
+  PanResponder, Image, Modal, Dimensions, Alert, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, {
@@ -16,6 +16,7 @@ import * as MediaLibrary from "expo-media-library";
 import { Colors, Radius, Spacing, FontSize } from "../lib/theme";
 import { DrawingPath, DrawingSticker } from "../lib/data/types";
 import { STICKER_CATEGORIES } from "../lib/stickers";
+import { floodFillImage } from "../lib/flood-fill";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -73,10 +74,10 @@ const VEHICLE_EMOJIS: Record<string, string> = {
 
 const BRUSH_SIZES = [2, 5, 10, 18, 28];
 
-type Tool = "pen" | "sketch" | "highlight" | "eraser" | "sticker";
+type Tool = "pen" | "sketch" | "highlight" | "eraser" | "sticker" | "fill";
 
 type Sticker = DrawingSticker;
-interface CanvasState { paths: DrawingPath[]; stickers: Sticker[] }
+interface CanvasState { paths: DrawingPath[]; stickers: Sticker[]; bg?: string }
 
 export interface DrawingCanvasProps {
   onSave?: (paths: DrawingPath[], stickers: Sticker[], imageUri: string) => void;
@@ -116,7 +117,10 @@ export function DrawingCanvas({
   const [tool, setTool] = useState<Tool>("pen");
   const [glowMode, setGlowMode] = useState(detectedGlow);
   const [bgImage, setBgImage] = useState<string | undefined>(initialBgImage);
+  const [fillBusy, setFillBusy] = useState(false);
   const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
+  const bgImageRef = useRef<string | undefined>(initialBgImage);
+  const canvasSizeRef = useRef<{ w: number; h: number }>({ w: 1, h: 1 });
   const [selectedSticker, setSelectedSticker] = useState("😂");
   const [stickerSize, setStickerSize] = useState(52);
   const [stickerCategory, setStickerCategory] = useState("😂 Funny Faces");
@@ -149,6 +153,7 @@ export function DrawingCanvas({
   glowRef.current = glowMode;
   selectedStickerRef.current = selectedSticker;
   stickerSizeRef.current = stickerSize;
+  bgImageRef.current = bgImage;
 
   useEffect(() => { stickersRef.current = stickers; }, [stickers]);
   useEffect(() => { pathsRef.current = paths; }, [paths]);
@@ -171,7 +176,27 @@ export function DrawingCanvas({
     : (glowMode ? NEON_COLORS : REGULAR_COLORS);
 
   function pushUndo(p = pathsRef.current, s = stickersRef.current) {
-    setUndoStack(st => [...st.slice(-20), { paths: [...p], stickers: [...s] }]);
+    setUndoStack(st => [...st.slice(-20), { paths: [...p], stickers: [...s], bg: bgImageRef.current }]);
+  }
+
+  // Paint-bucket: snapshot the canvas, flood-fill under the tap, and show the
+  // result as the new background (flattening current strokes/stickers into it).
+  async function fillAt(x: number, y: number) {
+    if (fillBusy || !viewShotRef.current) return;
+    setFillBusy(true);
+    try {
+      const uri = await captureRef(viewShotRef, { format: "png", quality: 1, result: "tmpfile" });
+      const { w, h } = canvasSizeRef.current;
+      const filled = await floodFillImage(uri, x / Math.max(1, w), y / Math.max(1, h), colorRef.current);
+      if (filled) {
+        pushUndo(pathsRef.current, stickersRef.current);
+        setBgImage(filled);
+        bgImageRef.current = filled;
+        setPaths([]); pathsRef.current = [];
+        setStickers([]); stickersRef.current = [];
+      }
+    } catch {}
+    finally { setFillBusy(false); }
   }
 
   // Commit one finished stroke (used for single- AND multi-touch drawing).
@@ -202,6 +227,8 @@ export function DrawingCanvas({
       const prev = s[s.length - 1];
       setPaths(prev.paths);
       setStickers(prev.stickers);
+      setBgImage(prev.bg);
+      bgImageRef.current = prev.bg;
       stickersRef.current = prev.stickers;
       pathsRef.current = prev.paths;
       return s.slice(0, -1);
@@ -216,6 +243,12 @@ export function DrawingCanvas({
 
       onPanResponderGrant: (e) => {
         const { locationX: x, locationY: y } = e.nativeEvent;
+
+        // Paint-bucket: tap to flood-fill the enclosed area under the finger.
+        if (toolRef.current === "fill") {
+          void fillAt(x, y);
+          return;
+        }
 
         // Hit-test existing stickers (reversed = top-most first)
         const hit = [...stickersRef.current].reverse().find(s => {
@@ -301,7 +334,7 @@ export function DrawingCanvas({
           return;
         }
 
-        if (toolRef.current === "sticker") return;
+        if (toolRef.current === "sticker" || toolRef.current === "fill") return;
 
         // ── Multi-touch drawing: one stroke per finger ──
         const allTouches = e.nativeEvent.touches ?? [];
@@ -328,7 +361,7 @@ export function DrawingCanvas({
           dragStickerIdRef.current = null;
           return;
         }
-        if (toolRef.current === "sticker") return;
+        if (toolRef.current === "sticker" || toolRef.current === "fill") return;
 
         // Commit any in-progress strokes still down (last finger up).
         drawTouchesRef.current.forEach(p => commitStroke(p));
@@ -483,7 +516,8 @@ export function DrawingCanvas({
     <View style={styles.wrapper}>
 
       {/* ── Canvas ── */}
-      <ViewShot ref={viewShotRef} style={[styles.canvas, { backgroundColor: canvasBg }]} options={{ format: "png", quality: 0.92 }}>
+      <ViewShot ref={viewShotRef} style={[styles.canvas, { backgroundColor: canvasBg }]} options={{ format: "png", quality: 0.92 }}
+        onLayout={e => { const { width, height } = e.nativeEvent.layout; canvasSizeRef.current = { w: width, h: height }; }}>
         <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
 
           {/* Background image */}
@@ -641,6 +675,13 @@ export function DrawingCanvas({
         </View>
       </ViewShot>
 
+      {fillBusy && (
+        <View style={styles.fillBusy} pointerEvents="none">
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.fillBusyText}>🪣 Filling…</Text>
+        </View>
+      )}
+
       {/* ── Toolbar ── */}
       <View style={[styles.toolbar, glowMode && styles.toolbarDark, { paddingBottom: Math.max(Spacing.sm, insets.bottom) }]}>
 
@@ -650,6 +691,7 @@ export function DrawingCanvas({
           <ToolBtn icon="🖍️" label="Sketch" active={tool === "sketch"}    onPress={() => setTool("sketch")}    glow={glowMode} />
           <ToolBtn icon="🖊️" label="Marker" active={tool === "highlight"} onPress={() => { setTool("highlight"); if (!HIGHLIGHT_COLORS.includes(color)) setColor(HIGHLIGHT_COLORS[0]); }} glow={glowMode} />
           <ToolBtn icon="🧽"  label="Erase"  active={tool === "eraser"}    onPress={() => setTool("eraser")}    glow={glowMode} />
+          <ToolBtn icon="🪣"  label="Fill"   active={tool === "fill"}      onPress={() => { setTool("fill"); setSelectedStickerId(null); }} glow={glowMode} />
           <ToolBtn
             icon={selectedSticker.startsWith("__v__") ? (VEHICLE_EMOJIS[selectedSticker.slice(5)] ?? "🚗") : selectedSticker}
             label="Sticker"
@@ -1087,6 +1129,8 @@ const styles = StyleSheet.create({
 
   badgeRow: { position: "absolute", top: 10, right: 10, gap: 4 },
   badge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+  fillBusy: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.35)", gap: 10 },
+  fillBusyText: { color: "#fff", fontWeight: "800", fontSize: 16 },
   badgeText: { color: "#fff", fontWeight: "800", fontSize: 11, letterSpacing: 0.8 },
 
   stickerHint: {
