@@ -143,6 +143,14 @@ export function DrawingCanvas({
   const [glowMode, setGlowMode] = useState(detectedGlow);
   const [bgImage, setBgImage] = useState<string | undefined>(initialBgImage);
   const [fillBusy, setFillBusy] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [panMode, setPanMode] = useState(false);
+  const panModeRef = useRef(false);
+  const panXRef = useRef(0);
+  const panYRef = useRef(0);
+  const panStartRef = useRef({ x: 0, y: 0 });
   const [aiSvg, setAiSvg] = useState<string | undefined>(undefined);
   const [showAi, setShowAi] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
@@ -183,6 +191,9 @@ export function DrawingCanvas({
   selectedStickerRef.current = selectedSticker;
   stickerSizeRef.current = stickerSize;
   bgImageRef.current = bgImage;
+  panModeRef.current = panMode;
+  panXRef.current = panX;
+  panYRef.current = panY;
 
   useEffect(() => { stickersRef.current = stickers; }, [stickers]);
   useEffect(() => { pathsRef.current = paths; }, [paths]);
@@ -208,13 +219,26 @@ export function DrawingCanvas({
     setUndoStack(st => [...st.slice(-20), { paths: [...p], stickers: [...s], bg: bgImageRef.current }]);
   }
 
+  // Capture the canvas at 1x (reset zoom/pan first) so saves/fills get the FULL
+  // drawing, not the zoomed-in crop.
+  async function captureFull(opts: any): Promise<string> {
+    if (zoom !== 1 || panX !== 0 || panY !== 0) {
+      setZoom(1); setPanX(0); setPanY(0);
+      panXRef.current = 0; panYRef.current = 0;
+      await new Promise(r => setTimeout(r, 60));
+    }
+    return await captureRef(viewShotRef, opts);
+  }
+
+  function resetZoom() { setZoom(1); setPanX(0); setPanY(0); panXRef.current = 0; panYRef.current = 0; setPanMode(false); panModeRef.current = false; }
+
   // Paint-bucket: snapshot the canvas, flood-fill under the tap, and show the
   // result as the new background (flattening current strokes/stickers into it).
   async function fillAt(x: number, y: number) {
     if (fillBusy || !viewShotRef.current) return;
     setFillBusy(true);
     try {
-      const uri = await captureRef(viewShotRef, { format: "png", quality: 1, result: "tmpfile" });
+      const uri = await captureFull({ format: "png", quality: 1, result: "tmpfile" });
       const { w, h } = canvasSizeRef.current;
       const filled = await floodFillImage(uri, x / Math.max(1, w), y / Math.max(1, h), colorRef.current);
       if (filled) {
@@ -286,6 +310,12 @@ export function DrawingCanvas({
       onMoveShouldSetPanResponder: () => true,
 
       onPanResponderGrant: (e) => {
+        // Pan mode: drag moves the zoomed canvas instead of drawing.
+        if (panModeRef.current) {
+          panStartRef.current = { x: panXRef.current, y: panYRef.current };
+          return;
+        }
+
         const { locationX: x, locationY: y } = e.nativeEvent;
 
         // Paint-bucket: tap to flood-fill the enclosed area under the finger.
@@ -347,7 +377,14 @@ export function DrawingCanvas({
         setLiveStrokes(Array.from(drawTouchesRef.current.values()));
       },
 
-      onPanResponderMove: (e) => {
+      onPanResponderMove: (e, gestureState) => {
+        // Pan mode: translate the canvas by the drag distance.
+        if (panModeRef.current) {
+          setPanX(panStartRef.current.x + gestureState.dx);
+          setPanY(panStartRef.current.y + gestureState.dy);
+          return;
+        }
+
         const { locationX: x, locationY: y } = e.nativeEvent;
         const touches = e.nativeEvent.touches;
 
@@ -502,7 +539,7 @@ export function DrawingCanvas({
     let imageUri = "";
     try {
       if (viewShotRef.current)
-        imageUri = await captureRef(viewShotRef, { format: "png", quality: 0.92, result: "tmpfile" });
+        imageUri = await captureFull({ format: "png", quality: 0.92, result: "tmpfile" });
     } catch {}
     onSave?.(paths, stickers, imageUri);
   }
@@ -510,7 +547,7 @@ export function DrawingCanvas({
   async function saveToDevice() {
     try {
       if (!viewShotRef.current) { Alert.alert("Couldn't capture canvas"); return; }
-      const uri = await captureRef(viewShotRef, { format: "png", quality: 1, result: "tmpfile" });
+      const uri = await captureFull({ format: "png", quality: 1, result: "tmpfile" });
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission needed", "Allow access to your photos to save drawings.");
@@ -565,7 +602,10 @@ export function DrawingCanvas({
       {/* ── Canvas ── */}
       <ViewShot ref={viewShotRef} style={[styles.canvas, { backgroundColor: canvasBg }]} options={{ format: "png", quality: 0.92 }}
         onLayout={e => { const { width, height } = e.nativeEvent.layout; canvasSizeRef.current = { w: width, h: height }; }}>
-        <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
+        <View
+          style={[StyleSheet.absoluteFill, { transform: [{ translateX: panX }, { translateY: panY }, { scale: zoom }] }]}
+          {...panResponder.panHandlers}
+        >
 
           {/* Background image */}
           {bgImage && (
@@ -717,6 +757,27 @@ export function DrawingCanvas({
           )}
         </View>
       </ViewShot>
+
+      {/* Zoom controls (overlay — not captured) */}
+      <View style={styles.zoomControls} pointerEvents="box-none">
+        <TouchableOpacity style={styles.zoomBtn} onPress={() => { const z = Math.max(1, Math.round((zoom - 0.5) * 10) / 10); setZoom(z); if (z === 1) { setPanX(0); setPanY(0); } }}>
+          <Text style={styles.zoomBtnText}>－</Text>
+        </TouchableOpacity>
+        <View style={styles.zoomLevel}><Text style={styles.zoomLevelText}>{Math.round(zoom * 100)}%</Text></View>
+        <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoom(z => Math.min(4, Math.round((z + 0.5) * 10) / 10))}>
+          <Text style={styles.zoomBtnText}>＋</Text>
+        </TouchableOpacity>
+        {zoom > 1 && (
+          <TouchableOpacity style={[styles.zoomBtn, panMode && { backgroundColor: Colors.primary }]} onPress={() => setPanMode(p => !p)}>
+            <Text style={[styles.zoomBtnText, panMode && { color: "#fff" }]}>✋</Text>
+          </TouchableOpacity>
+        )}
+        {(zoom !== 1 || panMode) && (
+          <TouchableOpacity style={styles.zoomBtn} onPress={resetZoom}>
+            <Text style={styles.zoomBtnText}>⟲</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {fillBusy && (
         <View style={styles.fillBusy} pointerEvents="none">
@@ -1203,6 +1264,11 @@ const styles = StyleSheet.create({
   badge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   fillBusy: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.35)", gap: 10 },
   fillBusyText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  zoomControls: { position: "absolute", top: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 22, padding: 4 },
+  zoomBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.9)", alignItems: "center", justifyContent: "center" },
+  zoomBtnText: { fontSize: 18, fontWeight: "900", color: "#222" },
+  zoomLevel: { minWidth: 46, alignItems: "center" },
+  zoomLevelText: { color: "#fff", fontWeight: "800", fontSize: 12 },
   badgeText: { color: "#fff", fontWeight: "800", fontSize: 11, letterSpacing: 0.8 },
 
   stickerHint: {

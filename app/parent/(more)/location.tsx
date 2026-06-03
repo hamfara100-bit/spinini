@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
+import * as Location from "expo-location";
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ScrollView, Switch,
 } from "react-native";
@@ -36,6 +37,32 @@ function SafeZonesTab({ selectedKidId }: { selectedKidId: string }) {
   const [zoneLat, setZoneLat] = useState("");
   const [zoneLng, setZoneLng] = useState("");
   const [zoneRadius, setZoneRadius] = useState("200");
+  const [address, setAddress] = useState<string | null>(null);
+
+  const lat = kid?.lastLocation?.lat;
+  const lng = kid?.lastLocation?.lng;
+
+  // Reverse-geocode the last known coordinates into a readable street address.
+  useEffect(() => {
+    let cancelled = false;
+    setAddress(null);
+    if (lat == null || lng == null) return;
+    (async () => {
+      try {
+        const res = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (cancelled || !res?.[0]) return;
+        const a = res[0];
+        const parts = [
+          [a.streetNumber, a.street].filter(Boolean).join(" "),
+          a.city || a.subregion,
+          a.region,
+          a.postalCode,
+        ].filter(Boolean);
+        setAddress(parts.join(", ") || a.name || null);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [lat, lng]);
 
   const EMOJI_OPTIONS = ["🏠","🏫","🏃","⛪","🏟️","🌳","🏪","🏋️","🎾","🏊","📍","❤️"];
 
@@ -57,6 +84,12 @@ function SafeZonesTab({ selectedKidId }: { selectedKidId: string }) {
         <Text style={styles.cardTitle}>📡 Last Known Location</Text>
         {kid.lastLocation ? (
           <>
+            {address && (
+              <View style={styles.addressBox}>
+                <Text style={styles.addressIcon}>📍</Text>
+                <Text style={styles.addressText}>{address}</Text>
+              </View>
+            )}
             <View style={styles.coordRow}>
               <View style={styles.coordBox}><Text style={styles.coordLabel}>Latitude</Text><Text style={styles.coordValue}>{kid.lastLocation.lat.toFixed(5)}</Text></View>
               <View style={styles.coordBox}><Text style={styles.coordLabel}>Longitude</Text><Text style={styles.coordValue}>{kid.lastLocation.lng.toFixed(5)}</Text></View>
@@ -868,6 +901,9 @@ const styles = StyleSheet.create({
   tabTextActive: { color: Colors.primary },
   card: { backgroundColor: Colors.surfaceLight, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: 4, ...Shadow.sm },
   cardTitle: { fontSize: FontSize.base, fontWeight: "700", color: Colors.textPrimary, marginBottom: Spacing.sm },
+  addressBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.success + "15", borderRadius: Radius.md, padding: Spacing.sm, marginBottom: 10, borderWidth: 1, borderColor: Colors.success + "33" },
+  addressIcon: { fontSize: 18 },
+  addressText: { flex: 1, fontSize: FontSize.sm, fontWeight: "700", color: Colors.textPrimary, lineHeight: 19 },
   coordRow: { flexDirection: "row", gap: 12, marginBottom: 8 },
   coordBox: { flex: 1, backgroundColor: Colors.primary + "10", borderRadius: Radius.md, padding: Spacing.sm },
   coordLabel: { fontSize: FontSize.xs, fontWeight: "700", color: Colors.textSecondary, textTransform: "uppercase", marginBottom: 2 },

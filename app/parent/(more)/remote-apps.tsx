@@ -124,6 +124,25 @@ export default function RemoteAppsScreen() {
     );
   }
 
+  function addAllApps() {
+    const toAdd = filteredUnmanaged;
+    if (toAdd.length === 0) return;
+    Alert.alert(
+      "Add all apps?",
+      `Add all ${toAdd.length} app${toAdd.length === 1 ? "" : "s"} to manage for ${kid?.profile.name}? They'll be blocked by default — tap any to set access rules.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: `Add all ${toAdd.length}`,
+          onPress: () => {
+            toAdd.forEach(a => dispatch({ type: "INSTALL_APP", kidId, appId: a.packageName, appName: a.appName }));
+            setShowAddModal(false);
+          },
+        },
+      ],
+    );
+  }
+
   function removeApp(appId: string, appName: string) {
     Alert.alert("Remove App", `Stop managing ${appName} for ${kid?.profile.name}?`, [
       { text: "Cancel", style: "cancel" },
@@ -336,6 +355,13 @@ export default function RemoteAppsScreen() {
               )}
               <View style={{ height: 40 }} />
             </ScrollView>
+            {filteredUnmanaged.length > 0 && (
+              <View style={modal.footer}>
+                <TouchableOpacity style={modal.addAllBtn} onPress={addAllApps}>
+                  <Text style={modal.addAllText}>➕ Add ALL {filteredUnmanaged.length} apps</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </Modal>
       )}
@@ -702,6 +728,9 @@ const styles = StyleSheet.create({
 
 const modal = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.bgLight },
+  footer: { padding: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.surfaceLight },
+  addAllBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: 16, alignItems: "center", ...Shadow.sm },
+  addAllText: { color: "#fff", fontWeight: "800", fontSize: FontSize.base },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.cardLight, alignItems: "center", justifyContent: "center" },
   closeBtnText: { fontWeight: "700", color: Colors.textSecondary, fontSize: 16 },
