@@ -9,6 +9,7 @@ let LoudAlarm: {
   stopSystemAlarm: () => void;
   fireFullScreenAlarm: (title: string, body: string) => void;
   cancelFullScreenAlarm: () => void;
+  bringToFront: (title: string, body: string) => void;
   hasDndAccess: () => boolean;
 } | null = null;
 
@@ -49,6 +50,15 @@ export function fireFullScreenAlarm(title: string, body: string): void {
 /** Cancel the full-screen alarm notification and stop the looping alarm. */
 export function cancelFullScreenAlarm(): void {
   try { LoudAlarm?.cancelFullScreenAlarm(); } catch {}
+}
+
+/**
+ * Bring the app to the FRONT silently (no alarm) — used by remote instant lock
+ * so the kid's device pops to the foreground / lock screen even from another app
+ * or with the screen off.
+ */
+export function bringToFront(title: string, body: string): void {
+  try { LoudAlarm?.bringToFront(title, body); } catch {}
 }
 
 /** Whether the app has Do Not Disturb policy access */

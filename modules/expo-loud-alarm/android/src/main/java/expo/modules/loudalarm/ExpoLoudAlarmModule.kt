@@ -211,6 +211,45 @@ class ExpoLoudAlarmModule : Module() {
       } catch (_: Exception) {}
     }
 
+    /**
+     * Bring the app to the FRONT WITHOUT any alarm sound — used by the remote
+     * "instant lock" so the kid's device pops to the foreground (and shows the
+     * lock screen) even when they're in another app or the screen is off.
+     */
+    Function("bringToFront") { title: String, body: String ->
+      try {
+        ensureFsChannel()
+        val launch: Intent? = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        if (launch != null) {
+          launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+          launch.putExtra("spinini_lock", true)
+        }
+        val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+          PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        else PendingIntent.FLAG_UPDATE_CURRENT
+        val contentPi = launch?.let { PendingIntent.getActivity(context, 7012, it, piFlags) }
+
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+          Notification.Builder(context, FS_CHANNEL_ID)
+        else @Suppress("DEPRECATION") Notification.Builder(context)
+        builder
+          .setContentTitle(title)
+          .setContentText(body)
+          .setSmallIcon(context.applicationInfo.icon)
+          .setAutoCancel(true)
+        if (contentPi != null) {
+          builder.setContentIntent(contentPi)
+          builder.setFullScreenIntent(contentPi, true)
+        }
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(FS_NOTIF_ID + 1, builder.build())
+
+        if (launch != null) {
+          try { context.startActivity(launch) } catch (_: Exception) {}
+        }
+      } catch (_: Exception) {}
+    }
+
     /** Cancel the full-screen alarm notification AND stop the looping alarm. */
     Function("cancelFullScreenAlarm") {
       try {

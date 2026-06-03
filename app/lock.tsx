@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, AppState, type AppStateStatus } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAudioPlayer } from "expo-audio";
 import { useData, useKid } from "../lib/data/store";
 import { hashPin } from "../lib/utils";
 import { isLocked } from "../lib/data/logic";
+import { bringToFront } from "expo-loud-alarm";
 import { PinPad } from "../components/pin-pad";
 import { Mascot } from "../components/mascot";
 import { Colors, FontSize, Radius, Spacing } from "../lib/theme";
@@ -25,6 +26,24 @@ export default function LockScreen() {
       router.replace(`/kid/${id}/home` as any);
     }
   }, [kid]);
+
+  // While locked, if the child tries to leave (Home button / app switch / screen
+  // off), pull the app straight back to the front so the device stays locked.
+  const lockedNow = !!kid && isLocked(kid) && !kid.rules.freeMode;
+  const lockMsg = kid?.rules.lockMessage || "Your device is locked 🔒";
+  const lastFrontRef = useRef(0);
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+      if (!lockedNow) return;
+      if (next === "background" || next === "inactive") {
+        const now = Date.now();
+        if (now - lastFrontRef.current < 1500) return;
+        lastFrontRef.current = now;
+        try { bringToFront("🔒 Device Locked", lockMsg); } catch {}
+      }
+    });
+    return () => sub.remove();
+  }, [lockedNow, lockMsg]);
 
   if (!id) return null;
 

@@ -8,6 +8,7 @@ import { Colors } from "../../../lib/theme";
 import { AlarmOverlay } from "../../../components/alarm-overlay";
 import { LockdownOverlay } from "../../../components/lockdown-overlay";
 import { GameInviteOverlay } from "../../../components/game-invite-overlay";
+import { KidLockEnforcer } from "../../../components/kid-lock-enforcer";
 import { useData } from "../../../lib/data/store";
 import { notificationFeature } from "../../../lib/data/badges";
 
@@ -234,6 +235,9 @@ export default function KidLayout() {
 
       {/* Remote lockdown countdown — warning popup + floating timer, then auto-lock */}
       {id && <LockdownOverlay kidId={id} />}
+
+      {/* Instant lock — bring app to front + enforce the un-leaveable lock screen */}
+      {id && <KidLockEnforcer kidId={id} />}
     </View>
   );
 }
