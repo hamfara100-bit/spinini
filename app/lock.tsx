@@ -6,6 +6,7 @@ import { useData, useKid } from "../lib/data/store";
 import { hashPin } from "../lib/utils";
 import { isLocked } from "../lib/data/logic";
 import { bringToFront } from "expo-loud-alarm";
+import { setKioskLock } from "../lib/app-monitor-bridge";
 import { PinPad } from "../components/pin-pad";
 import { Mascot } from "../components/mascot";
 import { Colors, FontSize, Radius, Spacing } from "../lib/theme";
@@ -32,6 +33,12 @@ export default function LockScreen() {
   const lockedNow = !!kid && isLocked(kid) && !kid.rules.freeMode;
   const lockMsg = kid?.rules.lockMessage || "Your device is locked 🔒";
   const lastFrontRef = useRef(0);
+
+  // Keep the native hard lock in sync with this screen's lock state.
+  useEffect(() => {
+    try { setKioskLock(lockedNow); } catch {}
+  }, [lockedNow]);
+
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
       if (!lockedNow) return;

@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { useData } from "../lib/data/store";
 import { isLocked } from "../lib/data/logic";
 import { bringToFront } from "expo-loud-alarm";
+import { setKioskLock } from "../lib/app-monitor-bridge";
 
 export function KidLockEnforcer({ kidId }: { kidId: string }) {
   const { state } = useData();
@@ -26,6 +27,11 @@ export function KidLockEnforcer({ kidId }: { kidId: string }) {
   const lastFrontRef = useRef(0);
 
   const lockMsg = kid?.rules.lockMessage || "Your device is locked 🔒";
+
+  // Drive the native hard lock (kiosk) on every lock-state change.
+  useEffect(() => {
+    try { setKioskLock(locked); } catch {}
+  }, [locked]);
 
   // On the transition into a locked state, surface the app + lock screen.
   const wasLocked = useRef(false);

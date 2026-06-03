@@ -45,6 +45,11 @@ class ExpoAppMonitorModule : Module() {
       AppMonitorService.studyModeActive = active
     }
 
+    // Hard lock (kiosk): when active, every app except ours is bounced back.
+    Function("setLockMode") { active: Boolean ->
+      AppMonitorService.lockModeActive = active
+    }
+
     Function("getCurrentPackage") {
       AppMonitorService.currentForegroundPackage
     }

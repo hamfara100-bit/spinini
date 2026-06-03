@@ -28,6 +28,11 @@ class AppMonitorService : AccessibilityService() {
     var monitoringEnabled: Boolean = false
     var monitoredKidId: String = ""
 
+    // ── Hard lock (kiosk) mode ──────────────────────────────────────────────
+    // When active, ANY foreground app that isn't us (or essential system UI) is
+    // treated as blocked and the device is yanked straight back to our app.
+    var lockModeActive: Boolean = false
+
     // Minimum seconds between social alerts for the same keyword (avoid spam)
     private const val ALERT_COOLDOWN_MS = 30_000L
     private val lastAlertAt = mutableMapOf<String, Long>()
@@ -85,6 +90,35 @@ class AppMonitorService : AccessibilityService() {
   }
 
   private var lastScreenText = ""
+  private var lastRelaunchAt = 0L
+
+  /** Status bar, recents, IME, etc. — never bounce these or we fight the OS. */
+  private fun isSystemUiPackage(pkg: String): Boolean {
+    return pkg == "com.android.systemui" ||
+      pkg == "android" ||
+      pkg.endsWith(".inputmethod") ||
+      pkg.contains("inputmethod") ||
+      pkg.endsWith(".ime")
+  }
+
+  /** Pop our app (the lock screen) straight back to the foreground. */
+  private fun bringSelfToFront() {
+    val now = System.currentTimeMillis()
+    if (now - lastRelaunchAt < 700L) return   // debounce relaunch storms
+    lastRelaunchAt = now
+    try {
+      val launch = packageManager.getLaunchIntentForPackage(packageName)
+      if (launch != null) {
+        launch.addFlags(
+          Intent.FLAG_ACTIVITY_NEW_TASK or
+          Intent.FLAG_ACTIVITY_SINGLE_TOP or
+          Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        )
+        launch.putExtra("spinini_lock", true)
+        startActivity(launch)
+      }
+    } catch (_: Exception) {}
+  }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
     if (event == null) return
@@ -92,6 +126,24 @@ class AppMonitorService : AccessibilityService() {
     // ── 1. Track foreground app ────────────────────────────────────────────
     if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
       val pkg = event.packageName?.toString() ?: return
+
+      // HARD LOCK: while locked, the only allowed foreground app is us. Anything
+      // else (including the launcher / recents) is immediately bounced back so
+      // the child can't use the device. Essential system UI is ignored so we
+      // don't fight the status bar / IME.
+      if (lockModeActive && pkg.isNotEmpty() && pkg != packageName && !isSystemUiPackage(pkg)) {
+        bringSelfToFront()
+        // also report it as blocked so JS can drop the cover overlay
+        sendBroadcast(Intent(ACTION_APP_CHANGED).apply {
+          putExtra(EXTRA_PACKAGE, pkg)
+          putExtra("isBlocked", true)
+          putExtra("lockMode", true)
+          setPackage(packageName)
+        })
+        currentForegroundPackage = pkg
+        return
+      }
+
       if (pkg != currentForegroundPackage) {
         currentForegroundPackage = pkg
         val effectiveBlocked = blockedPackages + if (studyModeActive) studyModePackages else emptySet()

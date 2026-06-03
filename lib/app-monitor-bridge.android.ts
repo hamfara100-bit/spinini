@@ -14,6 +14,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const STATE_KEY = "@famkids/state/v1";
 const BG_EVENTS_KEY = "@famkids/bg-events";
+const OWN_PACKAGE = "com.famkids.app";
+
+// True while the device is under a parent-triggered hard lock.
+let kioskActive = false;
 
 async function getState(): Promise<any | null> {
   try {
@@ -114,7 +118,18 @@ export async function startAppMonitor() {
 
   subscription?.remove();
   subscription = addAppChangeListener(({ packageName, isBlocked }: { packageName: string; isBlocked: boolean }) => {
+    // Returning to our own app → always drop the cover overlay.
+    if (packageName === OWN_PACKAGE) {
+      DeviceLock.hideLock();
+      return;
+    }
     if (isBlocked) {
+      // Hard lock takes precedence — cover ANY other app instantly while the
+      // native service yanks us back to the front.
+      if (kioskActive) {
+        DeviceLock.showLock("🔒 Locked by your parent");
+        return;
+      }
       const kidName = state.kids?.find((k: any) =>
         k.rules?.blockedPackages?.includes(packageName) ||
         (k.rules?.studyMode && k.rules?.studyBlockedPackages?.includes(packageName))
@@ -129,10 +144,26 @@ export async function startAppMonitor() {
         },
         trigger: null,
       }).catch(() => {});
-    } else if (packageName === (state as any).ownPackage) {
-      DeviceLock.hideLock();
     }
   });
+}
+
+/**
+ * Turn the device-wide hard lock (kiosk) on/off. While on, the AccessibilityService
+ * bounces every other app back to ours and we keep a cover overlay over anything
+ * that flashes up in between. Called from the kid lock screen / lock enforcer.
+ */
+export function setKioskLock(active: boolean): void {
+  kioskActive = active;
+  try {
+    AppMonitor.setLockMode(active);
+    if (active) {
+      // Make sure the receivers are live so the cover overlay can be shown.
+      try { AppMonitor.startMonitoring(); } catch {}
+    } else {
+      try { DeviceLock.hideLock(); } catch {}
+    }
+  } catch {}
 }
 
 export function stopAppMonitor() {

@@ -29,6 +29,7 @@ interface ExpoAppMonitorModule extends NativeModule {
   setBlockedPackages(packages: string[]): void;
   setStudyModePackages(packages: string[]): void;
   setStudyModeActive(active: boolean): void;
+  setLockMode(active: boolean): void;
   setSocialMonitoring(enabled: boolean, kidId: string): void;
   getCurrentPackage(): string;
   startMonitoring(): void;
@@ -50,6 +51,7 @@ const stub = {
   setBlockedPackages: () => {},
   setStudyModePackages: () => {},
   setStudyModeActive: () => {},
+  setLockMode: () => {},
   setSocialMonitoring: () => {},
   getCurrentPackage: () => "",
   startMonitoring: () => {},
