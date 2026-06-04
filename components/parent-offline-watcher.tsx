@@ -40,8 +40,9 @@ export function ParentOfflineWatcher() {
         Notifications.scheduleNotificationAsync({
           content: {
             title: `📵 ${kid.profile.name}'s phone went offline`,
-            body: `No check-in for ${mins} min — the device may be off, out of battery, or the app was closed/removed.`,
+            body: `No check-in for ${mins} min — may be off, out of battery, or closed. Tap to check on them (Location / Find Phone / call).`,
             sound: true,
+            data: { route: "location" },
           },
           trigger: null,
         }).catch(() => {});
