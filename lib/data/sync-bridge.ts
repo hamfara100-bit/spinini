@@ -241,8 +241,13 @@ export function useFamilySync(
           )
           .subscribe((status) => {
             if (cancelled) return;
-            if (status === "SUBSCRIBED") { void drainAndApply(); setPoll(20000); } // realtime live → relax poll
-            else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") { setPoll(3000); }
+            // NOTE: "SUBSCRIBED" only means the channel connected — it does NOT
+            // guarantee postgres_changes are delivered (they aren't unless
+            // sync_events is in the realtime publication). So keep a brisk
+            // backstop poll regardless, bounding cross-device latency to a few
+            // seconds even when realtime/P2P silently deliver nothing.
+            if (status === "SUBSCRIBED") { void drainAndApply(); setPoll(2500); }
+            else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") { setPoll(2500); }
           });
       } catch {
         // Realtime unavailable — the fast backstop poll still delivers everything.

@@ -13,6 +13,7 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -51,9 +52,13 @@ class ExpoLoudAlarmModule : Module() {
   private fun startLoopInternal() {
     try {
       stopLoopInternal()
+      // Max EVERY plausible output stream — some devices/emulators only actually
+      // emit on music, others on alarm. Belt and suspenders.
       try {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        am.setStreamVolume(AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
+        for (stream in intArrayOf(AudioManager.STREAM_ALARM, AudioManager.STREAM_MUSIC, AudioManager.STREAM_RING, AudioManager.STREAM_NOTIFICATION)) {
+          try { am.setStreamVolume(stream, am.getStreamMaxVolume(stream), 0) } catch (_: Exception) {}
+        }
       } catch (_: Exception) {}
 
       val mp = MediaPlayer()
@@ -72,6 +77,7 @@ class ExpoLoudAlarmModule : Module() {
       var sourced = false
       try {
         val resId = context.resources.getIdentifier("spinini_alarm", "raw", context.packageName)
+        Log.i("SpininiAlarm", "raw resId=$resId pkg=${context.packageName}")
         if (resId != 0) {
           val afd = context.resources.openRawResourceFd(resId)
           if (afd != null) {
@@ -80,24 +86,29 @@ class ExpoLoudAlarmModule : Module() {
             sourced = true
           }
         }
-      } catch (_: Exception) {}
+      } catch (e: Exception) { Log.e("SpininiAlarm", "raw source failed", e) }
 
       if (!sourced) {
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
           ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
           ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        Log.i("SpininiAlarm", "falling back to system uri=$uri")
         if (uri != null) { mp.setDataSource(context, uri); sourced = true }
       }
 
       if (sourced) {
         mp.isLooping = true
+        mp.setVolume(1f, 1f)
+        mp.setOnErrorListener { _, what, extra -> Log.e("SpininiAlarm", "MediaPlayer error what=$what extra=$extra"); false }
         mp.prepare()
         mp.start()
         alarmPlayer = mp
+        Log.i("SpininiAlarm", "alarm started, isPlaying=${mp.isPlaying}")
       } else {
         mp.release()
+        Log.e("SpininiAlarm", "no audio source — nothing to play")
       }
-    } catch (_: Exception) {}
+    } catch (e: Exception) { Log.e("SpininiAlarm", "startLoopInternal failed", e) }
   }
 
   override fun definition() = ModuleDefinition {
