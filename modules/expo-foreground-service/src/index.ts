@@ -8,6 +8,9 @@ let Native: {
   isRunning: () => boolean;
   isBatteryExempt: () => boolean;
   requestBatteryExemption: () => boolean;
+  startTicker: (intervalMs: number) => boolean;
+  stopTicker: () => boolean;
+  addListener?: (name: string, cb: (e: any) => void) => { remove: () => void };
 } | null = null;
 
 try {
@@ -43,4 +46,25 @@ export function isBatteryExempt(): boolean {
 /** Prompt the user to exempt the app from battery optimization (system dialog). */
 export function requestBatteryExemption(): void {
   try { Native?.requestBatteryExemption(); } catch {}
+}
+
+/**
+ * Start a NATIVE heartbeat that fires `onTick` every `intervalMs` ms on its own
+ * OS thread — unlike a JS setInterval, it keeps firing while the app is
+ * backgrounded / screen off, so the caller can drive the sync poll in the
+ * background. Returns true if the native ticker started.
+ */
+export function startNativeTicker(intervalMs: number): boolean {
+  try { return Native?.startTicker(intervalMs) ?? false; } catch { return false; }
+}
+
+/** Stop the native heartbeat. */
+export function stopNativeTicker(): void {
+  try { Native?.stopTicker(); } catch {}
+}
+
+/** Subscribe to the native heartbeat. Returns an unsubscribe handle. */
+export function addTickListener(cb: () => void): { remove: () => void } {
+  try { return Native?.addListener?.("onTick", cb) ?? { remove: () => {} }; }
+  catch { return { remove: () => {} }; }
 }

@@ -41,6 +41,7 @@ import { uid, uuidv4 } from "../utils";
 import {
   enqueueEvent, fetchEvents, getCursor, setCursor, QUEUE_PAGE_LIMIT,
 } from "./offline-queue";
+import { startNativeTicker, stopNativeTicker, addTickListener } from "../../modules/expo-foreground-service/src";
 
 // Master switch. The relay only ever runs when `useFamilySync` is handed a
 // non-null per-family `roomId`, so a device that isn't signed into a family
@@ -144,6 +145,7 @@ export function useFamilySync(
     let unsubPeers: (() => void) | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+    let tickSub: { remove: () => void } | null = null;
 
     // A per-session id for this device, used as the queue's origin_peer so we can
     // skip our OWN rows on drain. Independent of Trystero — the Supabase queue
@@ -253,6 +255,16 @@ export function useFamilySync(
         // Realtime unavailable — the fast backstop poll still delivers everything.
       }
 
+      // ── NATIVE HEARTBEAT (keeps delivering when backgrounded / screen off) ──
+      // Android pauses the JS setInterval poll once the app isn't in the
+      // foreground, so on a device without FCM (e.g. emulators) nothing arrived
+      // with the screen off. This OS-thread timer fires regardless and drives
+      // the same drain, so alerts/chat/calls land in the background too.
+      try {
+        startNativeTicker(2500);
+        tickSub = addTickListener(() => { if (!cancelled) void drainAndApply(); });
+      } catch {}
+
       // ── OPTIONAL LIVE PATH (Trystero P2P, instant delivery) ────────────────
       // Layered on top. If it fails to load/connect, the polling above still
       // delivers everything — just a few seconds slower.
@@ -294,6 +306,8 @@ export function useFamilySync(
     return () => {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
+      try { stopNativeTicker(); } catch {}
+      tickSub?.remove();
       if (realtimeChannel) { try { supabase.removeChannel(realtimeChannel); } catch {} realtimeChannel = null; }
       unsub?.();
       unsubPeers?.();
