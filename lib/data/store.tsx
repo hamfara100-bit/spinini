@@ -340,6 +340,74 @@ function updateKid(state: AppState, kidId: string, updater: (k: KidState) => Kid
   return { ...state, kids: state.kids.map(k => k.profile.id === kidId ? updater(k) : k) };
 }
 
+/**
+ * Central FCM push hook. Called for every LOCALLY-initiated action (secureDispatch
+ * only — remote actions are applied via rawDispatch and never reach here), so the
+ * sender fires exactly one push to the right recipient. This is how chat, calls,
+ * pings, locks, SOS, invites, alerts etc. reach a screen-off / closed app.
+ */
+function maybePushForAction(action: AppAction, state: AppState): void {
+  let target: import("../push").PushTarget | null = null;
+  let title = "Spinini", body = "", data: Record<string, any> = {};
+  switch (action.type) {
+    case "NOTIFICATION_ADD": {
+      const n = action.notification;
+      target = { targetOwnerId: action.kidId };
+      title = `${n.emoji ?? "🔔"} ${n.title}`; body = n.body || ""; data = { kind: n.kind, route: n.route };
+      break;
+    }
+    case "FAMILY_CHAT_PUSH": {
+      const m = action.message;
+      const preview = m.text || (m.imageUri ? "📷 Photo" : m.audioUri ? "🎤 Voice message" : m.sticker ? `${m.sticker} sticker` : "New message");
+      // Push owner ids are "parent" or kid profile ids; the parent's chat author
+      // marker is "__parent__" — normalize so the sender isn't self-notified.
+      const except = m.authorId === "__parent__" ? "parent" : m.authorId;
+      target = { targetAllExcept: except };
+      title = `💬 ${m.authorName}`; body = preview; data = { kind: "chat", route: "communicate" };
+      break;
+    }
+    case "CALL_REQUEST": {
+      const c = action.call;
+      const fromKid = state.deviceRole === "kid";
+      target = fromKid ? { targetRole: "parent" } : { targetOwnerId: c.kidId };
+      title = `📞 Incoming ${c.callType === "video" ? "video " : ""}call`;
+      body = `${fromKid ? c.kidName : (state.parentSettings.name || "Parent")} is calling — tap to answer`;
+      data = { kind: "call", route: "communicate" };
+      break;
+    }
+    case "SOS_ALERT": {
+      target = { targetRole: "parent" };
+      title = `🚨 SOS from ${action.alert.kidName}!`;
+      body = action.alert.lat ? `Location: ${action.alert.lat.toFixed(4)}, ${action.alert.lng?.toFixed(4)}` : "Check on your child now!";
+      data = { kind: "sos" };
+      break;
+    }
+    case "SET_INSTANT_LOCK": {
+      if (!action.locked) return;
+      target = { targetOwnerId: action.kidId };
+      title = "🔒 Device Locked"; body = action.message || "Your device is locked"; data = { kind: "lock" };
+      break;
+    }
+    case "OGAME_INVITE": {
+      target = { targetOwnerId: action.invite.toId };
+      title = "🎮 Game Night invite!"; body = `${action.invite.fromName} wants to play ${action.invite.gameName}`; data = { kind: "game_invite" };
+      break;
+    }
+    case "BADWORD_ALERT_ADD": {
+      target = { targetRole: "parent" };
+      title = `🚨 Bad word (${action.alert.appName})`; body = `"${action.alert.word}" — ${action.alert.text || action.alert.title}`; data = { kind: "badword" };
+      break;
+    }
+    case "TAMPER_ALERT_ADD": {
+      target = { targetRole: "parent" };
+      title = "⚠️ Protection turned off"; body = `${action.alert.label} disabled on ${action.alert.kidName}'s phone`; data = { kind: "tamper" };
+      break;
+    }
+    default: return;
+  }
+  if (target) { try { require("../push").sendPush(target, title, body, data); } catch {} }
+}
+
 // ── Online Game Night helpers ────────────────────────────────────────────────
 const MEMORY_PAIRS_ONLINE = 6;
 
@@ -2560,6 +2628,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // Relay this locally-applied action to the other device(s). Secrets are
     // denylisted inside the bridge; no-op when the P2P swarm isn't connected.
     broadcastRef.current(action);
+
+    // Fire an FCM push to the recipient so it reaches a screen-off / closed app.
+    maybePushForAction(action, state);
 
     // Notification batching: collect chore submissions and fire one grouped notification after 90s
     if (action.type === "CHORE_SUBMIT_PROOF") {

@@ -21,6 +21,14 @@ import { getMembership } from "./family-account";
 export type PushRole = "parent" | "kid";
 
 let lastRegisteredToken: string | null = null;
+let cachedFamilyId: string | null = null;
+
+async function familyId(): Promise<string | null> {
+  if (cachedFamilyId) return cachedFamilyId;
+  const m = await getMembership();
+  cachedFamilyId = m?.familyId ?? null;
+  return cachedFamilyId;
+}
 
 /**
  * Register THIS device's FCM token against the signed-in family member so others
@@ -43,6 +51,7 @@ export async function registerForPush(ownerId: string, role: PushRole): Promise<
     if (!token) return;
     if (token === lastRegisteredToken) return; // already up to date this session
 
+    cachedFamilyId = membership.familyId;
     const { error } = await supabase.rpc("register_push_token", {
       p_family_id: membership.familyId,
       p_owner_id: ownerId,
@@ -61,6 +70,8 @@ export interface PushTarget {
   targetOwnerId?: string;
   /** All devices of a role in the family. */
   targetRole?: PushRole;
+  /** Everyone in the family EXCEPT this owner id (e.g. group chat — not the sender). */
+  targetAllExcept?: string;
 }
 
 /**
@@ -74,13 +85,14 @@ export async function sendPush(
   data?: Record<string, any>,
 ): Promise<void> {
   try {
-    const membership = await getMembership();
-    if (!membership?.familyId) return;
+    const fid = await familyId();
+    if (!fid) return;
     await supabase.functions.invoke("send-push", {
       body: {
-        familyId: membership.familyId,
+        familyId: fid,
         targetOwnerId: target.targetOwnerId,
         targetRole: target.targetRole,
+        targetAllExcept: target.targetAllExcept,
         title,
         body,
         data: data ?? {},

@@ -40,11 +40,6 @@ export default function ParentFindPhoneScreen() {
                 forceVibrate: true,
               },
             });
-            // FCM push so it rings even when the kid's screen is off / app closed.
-            try {
-              const { sendPush } = require("../../../lib/push");
-              sendPush({ targetOwnerId: kidId }, "📱 Find My Phone", "Ring Ring Ring! Tap to stop the alarm.", { kind: "find_phone", kidId });
-            } catch {}
             setSentTo(kidId);
             setTimeout(() => setSentTo(null), 4000);
           },

@@ -74,8 +74,8 @@ Deno.serve(async (req) => {
     if (!saRaw) return new Response(JSON.stringify({ error: "FCM_SERVICE_ACCOUNT not set" }), { status: 500 });
     const sa = JSON.parse(saRaw);
 
-    const { familyId, targetOwnerId, targetRole, title, body, data } = await req.json();
-    if (!familyId || (!targetOwnerId && !targetRole)) {
+    const { familyId, targetOwnerId, targetRole, targetAllExcept, title, body, data } = await req.json();
+    if (!familyId || (!targetOwnerId && !targetRole && !targetAllExcept)) {
       return new Response(JSON.stringify({ error: "familyId and a target required" }), { status: 400 });
     }
 
@@ -88,6 +88,7 @@ Deno.serve(async (req) => {
     let q = supabase.from("device_push_tokens").select("token, owner_id, role").eq("family_id", familyId);
     if (targetOwnerId) q = q.eq("owner_id", targetOwnerId);
     else if (targetRole) q = q.eq("role", targetRole);
+    else if (targetAllExcept) q = q.neq("owner_id", targetAllExcept);
     const { data: rows, error } = await q;
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 403 });
     const tokens: string[] = [...new Set((rows ?? []).map((r: any) => r.token))];

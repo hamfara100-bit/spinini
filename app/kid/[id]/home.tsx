@@ -593,12 +593,6 @@ export default function KidHome() {
           // the loud SOS alarm + notification. The sender (kid) gets NO push for
           // their own alert; just a quiet on-screen confirmation.
           dispatch({ type: "SOS_ALERT", alert: sosAlert });
-          // Push so a closed parent app still gets the SOS immediately.
-          try {
-            const { sendPush } = require("../../../lib/push");
-            sendPush({ targetRole: "parent" }, `🚨 SOS from ${kid.profile.name}!`, lat ? `Location: ${lat.toFixed(4)}, ${lng?.toFixed(4)}` : "Check on your child now!", { kind: "sos", kidId: id });
-          } catch {}
-
           setSosLoading(false);
           Alert.alert("✅ SOS Sent!", "Your parents have been notified and are on their way.");
         },
