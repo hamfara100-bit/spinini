@@ -183,10 +183,12 @@ function ChatNotifier() {
   const seen = useRef<Set<string>>(new Set());
   const seeded = useRef(false);
 
-  // Who am I on this device? Parent uses a fixed id; kid uses their profile id.
-  const myId = pathname.startsWith("/parent")
-    ? "__parent__"
-    : (pathname.match(/^\/kid\/([^/]+)/)?.[1] ?? null);
+  // Who am I on this device? Derive from the DEVICE ROLE (not the current route,
+  // which is unreliable) so the sender never notifies themselves. Parent chat
+  // author is "__parent__"; a kid device is its own profile id.
+  const myId = state.deviceRole === "kid"
+    ? (state.kids[0]?.profile.id ?? null)
+    : "__parent__";
   // Already looking at a chat/call screen? Then don't interrupt.
   const onChatRef = useRef(false);
   onChatRef.current = /callchat|communicate|\/chat/.test(pathname);
@@ -237,9 +239,11 @@ function SocialNotifier() {
   const seenPosts = useRef<Set<string>>(new Set());
   const seeded = useRef(false);
 
-  const myId = pathname.startsWith("/parent")
-    ? "parent"
-    : (pathname.match(/^\/kid\/([^/]+)/)?.[1] ?? null);
+  // Identity from device role (not the route) so the author never self-notifies.
+  // Social posts use "parent" (not "__parent__") as the parent author id.
+  const myId = state.deviceRole === "kid"
+    ? (state.kids[0]?.profile.id ?? null)
+    : "parent";
   const onSocialRef = useRef(false);
   onSocialRef.current = /\/social/.test(pathname);
   const myIdRef = useRef(myId);
