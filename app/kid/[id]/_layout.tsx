@@ -4,6 +4,7 @@ import { Tabs, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import * as Notifications from "expo-notifications";
+import { ALERT_TRIGGER } from "../../../lib/notify";
 import { Colors } from "../../../lib/theme";
 import { AlarmOverlay } from "../../../components/alarm-overlay";
 import { LockdownOverlay } from "../../../components/lockdown-overlay";
@@ -50,7 +51,7 @@ function KidPingNotifier({ kidId }: { kidId: string }) {
       Vibration.vibrate([0, 300, 150, 300]);
       Notifications.scheduleNotificationAsync({
         content: { title: `${n.emoji ?? "🔔"} ${n.title}`, body: n.body || "", sound: true, data: { route } },
-        trigger: null,
+        trigger: ALERT_TRIGGER,
       }).catch(() => {});
     }
   }, [notifs.length]);

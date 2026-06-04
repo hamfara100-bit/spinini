@@ -9,6 +9,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Vibration, Platform, Animated } from "react-native";
 import * as Notifications from "expo-notifications";
+import { ALERT_TRIGGER } from "../lib/notify";
 import { useData } from "../lib/data/store";
 import type { SosAlert } from "../lib/data/types";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../lib/theme";
@@ -38,7 +39,7 @@ export function ParentSosOverlay() {
         body: alert.lat ? `Location: ${alert.lat.toFixed(4)}, ${alert.lng?.toFixed(4)}` : "Check on your child NOW!",
         sound: true,
       },
-      trigger: null,
+      trigger: ALERT_TRIGGER,
     }).catch(() => {});
   }, [alert?.id]);
 

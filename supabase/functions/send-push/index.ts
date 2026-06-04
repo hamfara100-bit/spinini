@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
           token,
           notification: { title: title ?? "Spinini", body: body ?? "" },
           data: dataStr,
-          android: { priority: "HIGH", notification: { channel_id: "default", sound: "default" } },
+          android: { priority: "HIGH", notification: { channel_id: "spinini-alerts-v1", sound: "spinini_notify", default_sound: false } },
         },
       };
       const r = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {

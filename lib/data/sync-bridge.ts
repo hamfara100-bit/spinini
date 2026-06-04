@@ -32,6 +32,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { AppState as RNAppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createCommsTransport } from "../comms/transport";
 import type { CommsSyncTransport, SyncEnvelope } from "../comms/transport";
@@ -146,6 +147,7 @@ export function useFamilySync(
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
     let tickSub: { remove: () => void } | null = null;
+    let appStateSub: { remove: () => void } | null = null;
 
     // A per-session id for this device, used as the queue's origin_peer so we can
     // skip our OWN rows on drain. Independent of Trystero — the Supabase queue
@@ -259,10 +261,17 @@ export function useFamilySync(
       // Android pauses the JS setInterval poll once the app isn't in the
       // foreground, so on a device without FCM (e.g. emulators) nothing arrived
       // with the screen off. This OS-thread timer fires regardless and drives
-      // the same drain, so alerts/chat/calls land in the background too.
+      // the same drain. To save battery it only ticks FAST when backgrounded —
+      // in the foreground the JS poll + realtime already cover delivery, so the
+      // native ticker idles slow.
       try {
-        startNativeTicker(2500);
+        const applyTickRate = () => {
+          const bg = RNAppState.currentState !== "active";
+          startNativeTicker(bg ? 3000 : 20000);
+        };
+        applyTickRate();
         tickSub = addTickListener(() => { if (!cancelled) void drainAndApply(); });
+        appStateSub = RNAppState.addEventListener("change", () => { if (!cancelled) applyTickRate(); });
       } catch {}
 
       // ── OPTIONAL LIVE PATH (Trystero P2P, instant delivery) ────────────────
@@ -308,6 +317,7 @@ export function useFamilySync(
       if (pollTimer) clearInterval(pollTimer);
       try { stopNativeTicker(); } catch {}
       tickSub?.remove();
+      appStateSub?.remove();
       if (realtimeChannel) { try { supabase.removeChannel(realtimeChannel); } catch {} realtimeChannel = null; }
       unsub?.();
       unsubPeers?.();

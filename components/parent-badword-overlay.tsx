@@ -9,6 +9,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Vibration, Platform, Animated, ScrollView } from "react-native";
 import * as Notifications from "expo-notifications";
+import { ALERT_TRIGGER } from "../lib/notify";
 import { useData } from "../lib/data/store";
 import type { BadWordAlert } from "../lib/data/types";
 import { Colors, FontSize, Radius, Shadow, Spacing } from "../lib/theme";
@@ -51,7 +52,7 @@ export function ParentBadWordOverlay() {
         body: `"${alert.word}" — ${alert.text || alert.title}`,
         sound: true,
       },
-      trigger: null,
+      trigger: ALERT_TRIGGER,
     }).catch(() => {});
   }, [alert?.id]);
 

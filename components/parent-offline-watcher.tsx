@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
+import { ALERT_TRIGGER } from "../lib/notify";
 import { useData } from "../lib/data/store";
 
 const OFFLINE_AFTER_MS = 12 * 60 * 1000; // 3 missed heartbeats
@@ -44,7 +45,7 @@ export function ParentOfflineWatcher() {
             sound: true,
             data: { route: "location" },
           },
-          trigger: null,
+          trigger: ALERT_TRIGGER,
         }).catch(() => {});
       } else if (!isOffline && wasOffline) {
         offlineRef.current.delete(kid.profile.id); // back online → re-arm

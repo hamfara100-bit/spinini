@@ -22,6 +22,7 @@ import { startAppMonitor, stopAppMonitor } from "../lib/app-monitor-bridge";
 import { startForegroundService, requestBatteryExemption, isBatteryExempt } from "../modules/expo-foreground-service/src";
 import { OfflineBanner } from "../components/offline-banner";
 import * as Notifications from "expo-notifications";
+import { ensureAlertChannel, ALERT_TRIGGER } from "../lib/notify";
 import { getRemainingMinutes } from "../lib/data/logic";
 
 // ── Global notification behaviour ────────────────────────────────────────────
@@ -48,6 +49,8 @@ Notifications.setNotificationHandler({
 function NotificationSetup() {
   useEffect(() => {
     if (Platform.OS !== "android") return;
+    // Audible alert channel (bundled sound) — alerts route here via ALERT_TRIGGER.
+    ensureAlertChannel();
     Notifications.setNotificationChannelAsync("default", {
       name: "Spinini Alerts",
       importance: Notifications.AndroidImportance.MAX,
@@ -218,7 +221,7 @@ function ChatNotifier() {
       Vibration.vibrate([0, 350, 180, 350]);
       Notifications.scheduleNotificationAsync({
         content: { title: `💬 ${m.authorName}`, body: m.text || m.sticker || (m.imageUri ? "📷 Photo" : m.audioUri ? "🎙️ Voice message" : "New message"), sound: true, data: { route: chatRoute } },
-        trigger: null,
+        trigger: ALERT_TRIGGER,
       }).catch(() => {});
     }
   }, [state.familyMessages]);
@@ -276,7 +279,7 @@ function SocialNotifier() {
           Vibration.vibrate([0, 250, 120, 250]);
           Notifications.scheduleNotificationAsync({
             content: { title: `📱 ${nameOf(p.authorId)} posted`, body: p.caption || "New family post", sound: true, data: { route: socialRoute } },
-            trigger: null,
+            trigger: ALERT_TRIGGER,
           }).catch(() => {});
         }
       }
@@ -290,7 +293,7 @@ function SocialNotifier() {
           Vibration.vibrate([0, 250]);
           Notifications.scheduleNotificationAsync({
             content: { title: `❤️ ${nameOf(liker)} liked your post`, body: p.caption || "Family Social", sound: true, data: { route: socialRoute } },
-            trigger: null,
+            trigger: ALERT_TRIGGER,
           }).catch(() => {});
         }
       }
@@ -301,7 +304,7 @@ function SocialNotifier() {
           Vibration.vibrate([0, 250, 120, 250]);
           Notifications.scheduleNotificationAsync({
             content: { title: `💬 ${nameOf(c.authorId)} commented`, body: c.text || "New comment", sound: true, data: { route: socialRoute } },
-            trigger: null,
+            trigger: ALERT_TRIGGER,
           }).catch(() => {});
         }
       }
@@ -394,7 +397,7 @@ function ScreenTimeLimitNotifier() {
               sound: true,
               data: { route: `/parent/(more)/kid/${kid.profile.id}` },
             },
-            trigger: null,
+            trigger: ALERT_TRIGGER,
           }).catch(() => {});
         }
       }
