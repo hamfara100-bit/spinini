@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import * as Notifications from "expo-notifications";
 import { ALERT_TRIGGER } from "../../../lib/notify";
+import { wasLocallyNotified } from "../../../lib/notification-map";
 import { Colors } from "../../../lib/theme";
 import { AlarmOverlay } from "../../../components/alarm-overlay";
 import { LockdownOverlay } from "../../../components/lockdown-overlay";
@@ -34,6 +35,7 @@ function KidPingNotifier({ kidId }: { kidId: string }) {
     for (const n of notifs) {
       if (seen.current.has(n.id)) continue;
       seen.current.add(n.id);
+      if (wasLocallyNotified(n.id)) continue; // already shown by the bg sync drain
       // Tapping opens the feature this notification is about: its explicit route,
       // else the feature mapped from its kind, else the kid's home.
       const feat = notificationFeature(n);

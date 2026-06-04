@@ -23,6 +23,7 @@ import { startForegroundService, requestBatteryExemption, isBatteryExempt } from
 import { OfflineBanner } from "../components/offline-banner";
 import * as Notifications from "expo-notifications";
 import { ensureAlertChannel, ALERT_TRIGGER } from "../lib/notify";
+import { wasLocallyNotified } from "../lib/notification-map";
 import { getRemainingMinutes } from "../lib/data/logic";
 
 // ── Global notification behaviour ────────────────────────────────────────────
@@ -210,6 +211,7 @@ function ChatNotifier() {
       if (seen.current.has(m.id)) continue;
       seen.current.add(m.id);
       if (myIdRef.current && m.authorId === myIdRef.current) continue; // my own message
+      if (wasLocallyNotified(m.id)) continue;                           // already shown by the bg drain
       if (onChatRef.current) continue;                                  // already viewing chat
       // Land on the actual Call & Chat tab (robust); skip if we can't tell who we
       // are (myId null) so we never push a `/kid/null/...` blank route.

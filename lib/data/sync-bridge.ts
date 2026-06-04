@@ -43,6 +43,8 @@ import {
   enqueueEvent, fetchEvents, getCursor, setCursor, QUEUE_PAGE_LIMIT,
 } from "./offline-queue";
 import { startNativeTicker, stopNativeTicker, addTickListener } from "../../modules/expo-foreground-service/src";
+import { notify } from "../notify";
+import { localNotificationFor, markLocallyNotified } from "../notification-map";
 
 // Master switch. The relay only ever runs when `useFamilySync` is handed a
 // non-null per-family `roomId`, so a device that isn't signed into a family
@@ -165,6 +167,15 @@ export function useFamilySync(
         markApplied(eventId);
       }
       rawDispatch(action);
+      // When backgrounded, the React notifier components don't reliably flush,
+      // so fire the recipient's notification imperatively here. Foreground is
+      // handled by the notifier components (so we skip to avoid duplicates).
+      try {
+        if (RNAppState.currentState !== "active") {
+          const note = localNotificationFor(action, getStateRef.current());
+          if (note) { markLocallyNotified(note.dedupId); notify(note.title, note.body, note.data); }
+        }
+      } catch {}
     };
 
     // Walk the queue from `since`, page by page, invoking `onEvent` for each row.
