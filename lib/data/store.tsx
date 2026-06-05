@@ -13,6 +13,7 @@ import {
   checkersInit, checkersMoves, checkersApply, checkersWinner,
   chessInit, chessLegalMoves, chessApply, chessStatus, type ChessState,
   trashInit, trashTurn, type TrashState,
+  unoInit, unoApply, type UnoState,
 } from "../games/engine";
 import {
   AppState, AppAction, KidState, KidProfile, KidRules,
@@ -420,6 +421,7 @@ function ogInitBoard(gameId: import("./types").OnlineGameId): any {
     case "checkers": return checkersInit();
     case "chess":    return chessInit();
     case "trash":    return trashInit();
+    case "uno":      return unoInit();
     default:         return tttEmpty();
   }
 }
@@ -524,6 +526,11 @@ function ogApply(session: any, seat: 0 | 1, move: any): { board: any; turn: 0 | 
       const source: "stock" | "discard" = move?.source === "discard" ? "discard" : "stock";
       const res = trashTurn(session.board as TrashState, seat, source);
       return { board: res.state, turn: res.state.turn as 0 | 1, winner: res.winner === null ? null : (res.winner as 0 | 1) };
+    }
+    case "uno": {
+      const r = unoApply(session.board as UnoState, seat, move);
+      if (!r) return null;
+      return { board: r.state, turn: r.turn as 0 | 1, winner: r.winner === null ? null : (r.winner as 0 | 1) };
     }
     default:
       return null;

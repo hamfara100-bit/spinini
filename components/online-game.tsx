@@ -21,6 +21,7 @@ import {
   checkersMoves, type CkMove,
   chessLegalMoves, chessStatus, type ChessState, type ChessMove, type PieceType,
   trashRankLabel, type TrashState,
+  unoPlayable, type UnoState, type UnoCard, type UnoColor,
 } from "../lib/games/engine";
 import type { OnlineGameId } from "../lib/data/types";
 
@@ -36,6 +37,7 @@ const GAMES: { id: OnlineGameId; emoji: string; name: string; sub: string }[] = 
   { id: "checkers", emoji: "🔵",  name: "Checkers",    sub: "Jump & capture" },
   { id: "chess",    emoji: "♟️",  name: "Chess",       sub: "Checkmate the king" },
   { id: "trash",    emoji: "🃏",  name: "Trash",       sub: "Fill your row 1–10 first" },
+  { id: "uno",      emoji: "🎴",  name: "Uno",         sub: "Match color or number, first to empty" },
 ];
 const gameMeta = (id: OnlineGameId) => GAMES.find(g => g.id === id)!;
 
@@ -51,6 +53,7 @@ function initBoard(gameId: OnlineGameId): any {
     case "checkers": return e.checkersInit();
     case "chess":    return e.chessInit();
     case "trash":    return e.trashInit();
+    case "uno":      return e.unoInit();
     default:         return e.tttEmpty();
   }
 }
@@ -273,6 +276,8 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
             <Text style={s.scoreName} numberOfLines={1}>{p.name}{p.id === me ? " (you)" : ""}</Text>
             {g.gameId === "memory"
               ? <Text style={[s.scoreMark, { color: SEAT_COLOR[p.seat] }]}>{(g.board.scores as number[])[p.seat]}</Text>
+              : g.gameId === "uno"
+              ? <Text style={[s.scoreMark, { color: SEAT_COLOR[p.seat], fontSize: 13 }]}>{(g.board.hands?.[p.seat]?.length ?? 0)} 🎴</Text>
               : <Text style={[s.scoreMark, { color: SEAT_COLOR[p.seat] }]}>{g.gameId === "ttt" ? SEAT_MARK[p.seat] : "●"}</Text>}
           </View>
         ))}
@@ -297,6 +302,7 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
         {g.gameId === "checkers" && <CheckersBoard board={g.board} turn={g.turn} canPlay={canPlay} onMove={play} />}
         {g.gameId === "chess"    && <ChessBoard state={g.board} turn={g.turn} canPlay={canPlay} onMove={play} />}
         {g.gameId === "trash"    && <TrashBoard state={g.board} seat={g.turn} canPlay={canPlay} onMove={play} />}
+        {g.gameId === "uno"      && <UnoBoard state={g.board} seat={isSolo ? g.turn : (mySeat ?? 0)} canPlay={canPlay} onMove={play} />}
       </View>
 
       {/* Footer actions */}
@@ -570,6 +576,106 @@ function TrashBoard({ state, seat, canPlay, onMove }: { state: TrashState; seat:
     </View>
   );
 }
+
+// ─── Uno board ────────────────────────────────────────────────────────────────
+const UNO_HEX: Record<string, string> = { red: "#E4002B", yellow: "#FFC400", green: "#3FA34D", blue: "#1E88E5", wild: "#262335" };
+function unoLabel(v: any): string {
+  if (v === "skip") return "⦸";
+  if (v === "reverse") return "⇄";
+  if (v === "draw2") return "+2";
+  if (v === "wild") return "🌈";
+  if (v === "wild4") return "+4";
+  return String(v);
+}
+function UnoCardView({ card, w, dim }: { card: UnoCard; w: number; dim?: boolean }) {
+  const bg = UNO_HEX[card.color] ?? "#262335";
+  const fg = card.color === "yellow" ? "#1A1033" : "#fff";
+  return (
+    <View style={[un.card, { width: w, height: w * 1.45, backgroundColor: bg, opacity: dim ? 0.4 : 1 }]}>
+      <Text style={[un.cardVal, { color: fg, fontSize: w * 0.5 }]}>{unoLabel(card.value)}</Text>
+    </View>
+  );
+}
+function UnoBoard({ state, seat, canPlay, onMove }: { state: UnoState; seat: 0 | 1; canPlay: boolean; onMove: (m: any) => void }) {
+  const { width: W } = useWindowDimensions();
+  const [wildIdx, setWildIdx] = useState<number | null>(null);
+  const myHand = state.hands[seat] ?? [];
+  const oppCount = state.hands[seat === 0 ? 1 : 0]?.length ?? 0;
+  const top = state.discard[state.discard.length - 1];
+  const color = state.color;
+  const cardW = Math.max(34, Math.min(60, (W - 24) / Math.max(7, Math.min(myHand.length, 9))));
+
+  function tapCard(i: number) {
+    if (!canPlay) return;
+    const card = myHand[i];
+    if (!unoPlayable(card, top, color)) return;
+    if (card.color === "wild") { setWildIdx(i); return; }
+    onMove({ play: i });
+  }
+  function chooseColor(c: UnoColor) {
+    if (wildIdx == null) return;
+    onMove({ play: wildIdx, color: c });
+    setWildIdx(null);
+  }
+
+  return (
+    <View style={{ alignItems: "center", width: "100%" }}>
+      {/* Opponent's hand (face-down) */}
+      <View style={{ flexDirection: "row", marginBottom: 8 }}>
+        {Array.from({ length: Math.min(oppCount, 12) }).map((_, i) => (
+          <View key={i} style={[un.back, { marginLeft: i === 0 ? 0 : -16 }]} />
+        ))}
+        <Text style={{ color: "#b9b3d6", marginLeft: 8, alignSelf: "center", fontWeight: "800" }}>×{oppCount}</Text>
+      </View>
+
+      {/* Discard top + active color + draw pile */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 20, marginVertical: 10 }}>
+        <TouchableOpacity disabled={!canPlay} onPress={() => onMove({ draw: true })} style={[un.draw, !canPlay && { opacity: 0.5 }]}>
+          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 20 }}>🂠</Text>
+          <Text style={{ color: "#b9b3d6", fontSize: 11, marginTop: 2 }}>Draw ({state.draw.length})</Text>
+        </TouchableOpacity>
+        {top && <UnoCardView card={top} w={56} />}
+        <View style={[un.colorDot, { backgroundColor: UNO_HEX[color] }]} />
+      </View>
+
+      {/* My hand */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 8, alignItems: "flex-end", gap: 4 }} style={{ maxWidth: "100%" }}>
+        {myHand.map((card, i) => {
+          const ok = unoPlayable(card, top, color);
+          return (
+            <TouchableOpacity key={i} onPress={() => tapCard(i)} disabled={!canPlay || !ok} activeOpacity={0.8} style={{ marginTop: ok && canPlay ? 0 : 14 }}>
+              <UnoCardView card={card} w={cardW} dim={!ok} />
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      <Text style={s.hintLine}>{canPlay ? "Tap a matching card, or Draw" : "Waiting for opponent…"}</Text>
+
+      {/* Wild color picker */}
+      {wildIdx != null && (
+        <View style={un.colorPicker}>
+          <Text style={{ color: "#fff", fontWeight: "800", marginBottom: 8 }}>Pick a color</Text>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            {(["red", "yellow", "green", "blue"] as UnoColor[]).map(c => (
+              <TouchableOpacity key={c} onPress={() => chooseColor(c)} style={[un.colorChoice, { backgroundColor: UNO_HEX[c] }]} />
+            ))}
+          </View>
+          <TouchableOpacity onPress={() => setWildIdx(null)} style={{ marginTop: 10 }}><Text style={{ color: "#9b95c0" }}>Cancel</Text></TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const un = StyleSheet.create({
+  card: { borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#fff" },
+  cardVal: { fontWeight: "900" },
+  back: { width: 30, height: 44, borderRadius: 6, backgroundColor: "#3531a8", borderWidth: 2, borderColor: "#15122b" },
+  draw: { width: 70, height: 88, borderRadius: 10, backgroundColor: "#1c1838", borderWidth: 2, borderColor: "#3531a8", alignItems: "center", justifyContent: "center" },
+  colorDot: { width: 30, height: 30, borderRadius: 999, borderWidth: 2, borderColor: "#fff" },
+  colorPicker: { position: "absolute", bottom: 0, backgroundColor: "#1c1838ee", borderRadius: 16, padding: 16, alignItems: "center", borderWidth: 1, borderColor: "#3531a8" },
+  colorChoice: { width: 46, height: 46, borderRadius: 999, borderWidth: 2, borderColor: "#fff" },
+});
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.bgDark, alignItems: "center", justifyContent: "center", padding: 18 },

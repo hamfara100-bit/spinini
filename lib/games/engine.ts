@@ -628,3 +628,128 @@ export function trashTurn(state: TrashState, seat: Seat, source: "stock" | "disc
   st.turn = otherSeat(seat);
   return { state: st, placed, drawn, deadCard: dead, winner: null };
 }
+
+// ─── Uno ──────────────────────────────────────────────────────────────────────
+// A 2-seat Uno. The full game state (both hands, draw + discard piles, active
+// color) lives in the synced board; the UI only reveals YOUR own hand. Apply is
+// DETERMINISTIC (reshuffles reverse the discard pile, no RNG) so both devices
+// converge — only the initial deal uses RNG, which happens once on the host and
+// is synced.
+export type UnoColor = "red" | "yellow" | "green" | "blue";
+export type UnoValue = number | "skip" | "reverse" | "draw2" | "wild" | "wild4";
+export interface UnoCard { color: UnoColor | "wild"; value: UnoValue }
+export interface UnoState {
+  hands: [UnoCard[], UnoCard[]];
+  draw: UnoCard[];
+  discard: UnoCard[];
+  color: UnoColor;      // active color (chosen color after a wild)
+  turn: Seat;
+  winner: Seat | null;
+}
+
+const UNO_COLORS: UnoColor[] = ["red", "yellow", "green", "blue"];
+
+function unoBuildDeck(): UnoCard[] {
+  const deck: UnoCard[] = [];
+  for (const color of UNO_COLORS) {
+    deck.push({ color, value: 0 });
+    for (let v = 1; v <= 9; v++) { deck.push({ color, value: v }); deck.push({ color, value: v }); }
+    for (const a of ["skip", "reverse", "draw2"] as const) { deck.push({ color, value: a }); deck.push({ color, value: a }); }
+  }
+  for (let i = 0; i < 4; i++) { deck.push({ color: "wild", value: "wild" }); deck.push({ color: "wild", value: "wild4" }); }
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  return deck;
+}
+
+export function unoInit(): UnoState {
+  const deck = unoBuildDeck();
+  const h0 = deck.splice(0, 7);
+  const h1 = deck.splice(0, 7);
+  // Start the discard on a plain colored card (never a wild/action mess).
+  let first = deck.shift()!;
+  while (first.color === "wild" || typeof first.value !== "number") { deck.push(first); first = deck.shift()!; }
+  return { hands: [h0, h1], draw: deck, discard: [first], color: first.color as UnoColor, turn: 0, winner: null };
+}
+
+function unoTop(s: UnoState): UnoCard { return s.discard[s.discard.length - 1]; }
+
+/** Can `card` legally be played on `top` given the active `color`? */
+export function unoPlayable(card: UnoCard, top: UnoCard, color: UnoColor): boolean {
+  if (card.color === "wild") return true;
+  if (card.color === color) return true;
+  return card.value === top.value;
+}
+
+export function unoHasMove(hand: UnoCard[], top: UnoCard, color: UnoColor): boolean {
+  return hand.some(c => unoPlayable(c, top, color));
+}
+
+function unoReshuffleIfNeeded(s: UnoState) {
+  if (s.draw.length === 0 && s.discard.length > 1) {
+    const top = s.discard.pop()!;
+    const rest = s.discard;          // deterministic: reverse, no RNG (sync-safe)
+    s.discard = [top];
+    s.draw = rest.reverse();
+  }
+}
+
+function unoDrawN(s: UnoState, seat: Seat, n: number) {
+  for (let i = 0; i < n; i++) {
+    unoReshuffleIfNeeded(s);
+    const c = s.draw.shift();
+    if (c) s.hands[seat].push(c);
+  }
+}
+
+function unoClone(s: UnoState): UnoState {
+  return {
+    hands: [s.hands[0].slice(), s.hands[1].slice()],
+    draw: s.draw.slice(),
+    discard: s.discard.slice(),
+    color: s.color,
+    turn: s.turn,
+    winner: s.winner,
+  };
+}
+
+/**
+ * Apply one Uno move. move = { play: number, color?: UnoColor } | { draw: true }.
+ * Returns the next { state, turn, winner } or null if illegal.
+ */
+export function unoApply(state: UnoState, seat: Seat, move: any): { state: UnoState; turn: Seat; winner: Seat | null } | null {
+  if (state.winner !== null || state.turn !== seat) return null;
+  const s = unoClone(state);
+  const other = otherSeat(seat);
+
+  if (move?.draw) {
+    unoDrawN(s, seat, 1);
+    s.turn = other;
+    return { state: s, turn: other, winner: null };
+  }
+
+  const idx = move?.play;
+  if (typeof idx !== "number") return null;
+  const card = s.hands[seat][idx];
+  if (!card) return null;
+  if (!unoPlayable(card, unoTop(s), s.color)) return null;
+
+  s.hands[seat].splice(idx, 1);
+  s.discard.push(card);
+  s.color = card.color === "wild"
+    ? (UNO_COLORS.includes(move?.color) ? move.color : "red")
+    : (card.color as UnoColor);
+
+  if (s.hands[seat].length === 0) { s.winner = seat; return { state: s, turn: seat, winner: seat }; }
+
+  // 2-player effects: action cards skip the opponent (so YOU play again);
+  // number/wild pass the turn.
+  let next: Seat = other;
+  switch (card.value) {
+    case "skip": case "reverse": next = seat; break;
+    case "draw2": unoDrawN(s, other, 2); next = seat; break;
+    case "wild4": unoDrawN(s, other, 4); next = seat; break;
+    default: next = other;
+  }
+  s.turn = next;
+  return { state: s, turn: next, winner: null };
+}

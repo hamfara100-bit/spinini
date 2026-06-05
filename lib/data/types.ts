@@ -2059,7 +2059,7 @@ export interface OnlineGameInvite {
 }
 
 // ─── Online (cross-device) Game Night ────────────────────────────────────────
-export type OnlineGameId = "ttt" | "connect4" | "hangman" | "memory" | "checkers" | "chess" | "trash";
+export type OnlineGameId = "ttt" | "connect4" | "hangman" | "memory" | "checkers" | "chess" | "trash" | "uno";
 
 export interface OnlineGamePlayer {
   id: string;          // "parent" or a kid profile id
