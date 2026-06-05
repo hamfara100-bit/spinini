@@ -538,11 +538,8 @@ export default function CommunicateScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#FAF7FF" }}>
-      {/* Header */}
-      <View style={s.header}>
-        <Text style={s.title}>📞 Call & Text</Text>
-        <Text style={s.subtitle}>Reach your family on the phone</Text>
-      </View>
+      {/* Thin status-bar spacer (title removed to reclaim space) */}
+      <View style={s.header} />
 
       {/* Tab bar */}
       <View style={s.tabBar}>
@@ -572,7 +569,7 @@ export default function CommunicateScreen() {
 
 const s = StyleSheet.create({
   header: {
-    paddingTop: 52, paddingBottom: Spacing.sm, paddingHorizontal: Spacing.lg,
+    height: 28, // just clears the status bar; title removed to reclaim space
     backgroundColor: Colors.primary,
   },
   title:    { fontSize: FontSize.xl, fontWeight: "800", color: "#fff" },
