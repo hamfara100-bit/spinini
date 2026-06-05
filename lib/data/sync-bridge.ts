@@ -171,11 +171,11 @@ export function useFamilySync(
       // so fire the recipient's notification imperatively here. Foreground is
       // handled by the notifier components (so we skip to avoid duplicates).
       try {
-        if (RNAppState.currentState !== "active") {
-          const note = localNotificationFor(action, getStateRef.current());
-          if (note) { markLocallyNotified(note.dedupId); notify(note.title, note.body, note.data); }
-        }
-      } catch {}
+        const bg = RNAppState.currentState !== "active";
+        const note = bg ? localNotificationFor(action, getStateRef.current()) : null;
+        console.log(`[SpininiDrain] apply ${action?.type} bg=${bg} note=${note ? "YES" : "no"}`);
+        if (note) { markLocallyNotified(note.dedupId); notify(note.title, note.body, note.data); }
+      } catch (e) { console.log("[SpininiDrain] apply err " + e); }
     };
 
     // Walk the queue from `since`, page by page, invoking `onEvent` for each row.
@@ -204,11 +204,15 @@ export function useFamilySync(
       draining = true;
       try {
         const start = await getCursor(familyId);
+        let n = 0;
         const last = await walkQueue(start, (e) => {
           if (e.origin_peer === self) markApplied(e.id);
-          else applyAction(e.id, e.payload);
+          else { n++; applyAction(e.id, e.payload); }
         });
+        if (n > 0) console.log(`[SpininiDrain] drained ${n} new events bg=${RNAppState.currentState !== "active"}`);
         if (!cancelled && last && last !== start) await setCursor(familyId, last);
+      } catch (e) {
+        console.log("[SpininiDrain] DRAIN ERROR (network blocked in bg?): " + e);
       } finally {
         draining = false;
       }
