@@ -443,6 +443,23 @@ export default function RemoteLockScreen() {
             )}
           </View>
 
+          {/* Anti-tamper: block Settings so the kid can't Force-Stop / uninstall */}
+          <TouchableOpacity
+            style={styles.funLockToggleRow}
+            onPress={() => dispatch({ type: "SET_LOCK_SETTINGS", kidId: kid.profile.id, on: !kid.rules.lockSettings })}
+          >
+            <Text style={styles.funLockToggleIcon}>🛡️</Text>
+            <Text style={styles.funLockToggleText}>
+              Block Settings — stops Force-Stop / uninstall {kid.rules.lockSettings ? "(ON)" : "(OFF)"}
+            </Text>
+            <Text style={styles.funLockChevron}>{kid.rules.lockSettings ? "✅" : "○"}</Text>
+          </TouchableOpacity>
+          {kid.rules.lockSettings && (
+            <Text style={[styles.allowNote, { marginHorizontal: 12, marginTop: -4, marginBottom: 6 }]}>
+              Needs the Accessibility service ON. To reconfigure the child's device, turn this OFF from here first.
+            </Text>
+          )}
+
           {/* Fun Lock toggle row */}
           <TouchableOpacity
             style={styles.funLockToggleRow}

@@ -766,6 +766,8 @@ function reducer(state: AppState, action: AppAction): AppState {
           ...(action.locked ? { lockAllowedApps: action.allowedApps ?? [], lockAllowedFeatures: action.allowedFeatures ?? [] } : {}),
         },
       }));
+    case "SET_LOCK_SETTINGS":
+      return updateKid(state, action.kidId, k => ({ ...k, rules: { ...k.rules, lockSettings: action.on } }));
     case "SET_DEAD_PHONE":
       return updateKid(state, action.kidId, k => ({
         ...k,

@@ -218,6 +218,7 @@ export interface KidRules {
   lockUntil?: string;
   lockAllowedApps?: string[];      // external app packages still usable while locked
   lockAllowedFeatures?: string[];  // in-app feature keys still usable while locked (see LOCK_FEATURES)
+  lockSettings?: boolean;          // anti-tamper: block the Settings/installer app so the kid can't force-stop/uninstall/disable accessibility
   deadPhone?: boolean;          // fake "dead" phone — kid sees a black, powered-off screen
   lockdownTimer?: LockdownTimer | null; // remote countdown → auto-lock when it expires
   contentFilter: ContentFilterSettings;
@@ -2247,6 +2248,7 @@ export type AppAction =
   | { type: "REMOVE_APP_SCHEDULE"; kidId: string; appId: string; scheduleId: string }
   | { type: "SET_APP_SCHEDULE_ENABLED"; kidId: string; appId: string; enabled: boolean }
   | { type: "SET_INSTANT_LOCK"; kidId: string; locked: boolean; message?: string; until?: string; allowedApps?: string[]; allowedFeatures?: string[] }
+  | { type: "SET_LOCK_SETTINGS"; kidId: string; on: boolean }
   | { type: "SET_DEAD_PHONE"; kidId: string; on: boolean }
   | { type: "SET_LOCKDOWN_TIMER"; kidId: string; timer: LockdownTimer | null }
   | { type: "SET_FUN_LOCK"; kidId: string; payload: Partial<FunLock> }

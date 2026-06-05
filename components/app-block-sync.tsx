@@ -18,6 +18,7 @@ export function AppBlockSync() {
       bp: k.rules.blockedPackages ?? [],
       sb: k.rules.studyBlockedPackages ?? [],
       sm: !!k.rules.studyMode,
+      ls: !!k.rules.lockSettings,
     })),
   );
   useEffect(() => {

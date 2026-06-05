@@ -53,11 +53,21 @@ const PROTECT_SNAPSHOT_KEY = "@famkids/protect-snapshot";
  * appRules, but the AccessibilityService only ever read `blockedPackages`, which
  * nothing populated — so nothing was ever blocked.
  */
+// Anti-tamper: blocking these keeps the kid out of Force Stop / Uninstall /
+// "turn off Accessibility". The parent toggles lockSettings; they turn it OFF
+// from THEIR phone (synced) when they need to reconfigure the kid device.
+const SETTINGS_LOCK_PKGS = [
+  "com.android.settings",
+  "com.android.packageinstaller",
+  "com.google.android.packageinstaller",
+];
+
 function blockedPkgsFor(kid: any): string[] {
   const out = new Set<string>(kid?.rules?.blockedPackages ?? []);
   for (const r of kid?.rules?.appRules ?? []) {
     if (r?.mode === "block" && r.appId) out.add(r.appId);
   }
+  if (kid?.rules?.lockSettings) for (const p of SETTINGS_LOCK_PKGS) out.add(p);
   return [...out];
 }
 
