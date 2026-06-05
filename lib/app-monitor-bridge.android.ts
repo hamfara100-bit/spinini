@@ -47,6 +47,41 @@ let protectInterval: ReturnType<typeof setInterval> | null = null;
 const PROTECT_SNAPSHOT_KEY = "@famkids/protect-snapshot";
 
 /**
+ * The set of packages a kid is blocked from — derived from App Rules: any rule
+ * in "block" mode (the App Rules default), plus any legacy explicit
+ * blockedPackages. THIS is the real bug fix: "Blocked" in App Rules writes
+ * appRules, but the AccessibilityService only ever read `blockedPackages`, which
+ * nothing populated — so nothing was ever blocked.
+ */
+function blockedPkgsFor(kid: any): string[] {
+  const out = new Set<string>(kid?.rules?.blockedPackages ?? []);
+  for (const r of kid?.rules?.appRules ?? []) {
+    if (r?.mode === "block" && r.appId) out.add(r.appId);
+  }
+  return [...out];
+}
+
+/**
+ * Push the current block list to the native AccessibilityService. Safe to call
+ * any time rules change (idempotent). Exported so the kid device can re-sync the
+ * instant a parent toggles a rule, not only on app start.
+ */
+export function syncBlockedApps(kids: any[]): void {
+  try {
+    const allBlocked = new Set<string>();
+    const allStudyBlocked = new Set<string>();
+    for (const kid of kids ?? []) {
+      for (const pkg of blockedPkgsFor(kid)) allBlocked.add(pkg);
+      for (const pkg of kid?.rules?.studyBlockedPackages ?? []) allStudyBlocked.add(pkg);
+    }
+    AppMonitor.setBlockedPackages([...allBlocked]);
+    AppMonitor.setStudyModePackages([...allStudyBlocked]);
+    AppMonitor.setStudyModeActive((kids ?? []).some((k: any) => k?.rules?.studyMode));
+    AppMonitor.startMonitoring();
+  } catch {}
+}
+
+/**
  * On a kid device, detect when a critical protection permission gets turned OFF
  * (tampering) and raise a synced TAMPER_ALERT so the parent is notified at once.
  * Compares the current grants to the last snapshot; only true→false transitions
@@ -159,19 +194,7 @@ export async function startAppMonitor() {
   const state = await getState();
   if (!state) return;
 
-  const allBlocked = new Set<string>();
-  const allStudyBlocked = new Set<string>();
-
-  for (const kid of state.kids ?? []) {
-    for (const pkg of kid.rules?.blockedPackages ?? []) allBlocked.add(pkg);
-    for (const pkg of kid.rules?.studyBlockedPackages ?? []) allStudyBlocked.add(pkg);
-  }
-
-  AppMonitor.setBlockedPackages([...allBlocked]);
-  AppMonitor.setStudyModePackages([...allStudyBlocked]);
-
-  const studyActive = (state.kids ?? []).some((k: any) => k.rules?.studyMode);
-  AppMonitor.setStudyModeActive(studyActive);
+  syncBlockedApps(state.kids ?? []);
 
   // Enable social monitoring for kids who have it turned on
   const firstMonitoredKid = (state.kids ?? []).find((k: any) => k.rules?.webFilter?.enabled);
@@ -227,7 +250,7 @@ export async function startAppMonitor() {
         return;
       }
       const kidName = state.kids?.find((k: any) =>
-        k.rules?.blockedPackages?.includes(packageName) ||
+        blockedPkgsFor(k).includes(packageName) ||
         (k.rules?.studyMode && k.rules?.studyBlockedPackages?.includes(packageName))
       )?.profile?.name ?? "your child";
 

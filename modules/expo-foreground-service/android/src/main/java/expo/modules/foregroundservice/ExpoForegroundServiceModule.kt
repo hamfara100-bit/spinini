@@ -28,8 +28,7 @@ class ExpoForegroundServiceModule : Module() {
     val h = Handler(ht.looper)
     val r = object : Runnable {
       override fun run() {
-        android.util.Log.i("SpininiTick", "native tick fired")
-        try { this@ExpoForegroundServiceModule.sendEvent("onTick", mapOf("t" to System.currentTimeMillis())) } catch (e: Exception) { android.util.Log.e("SpininiTick", "sendEvent failed", e) }
+        try { this@ExpoForegroundServiceModule.sendEvent("onTick", mapOf("t" to System.currentTimeMillis())) } catch (_: Exception) {}
         h.postDelayed(this, tickIntervalMs)
       }
     }

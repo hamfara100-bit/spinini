@@ -11,6 +11,7 @@ import { AlarmOverlay } from "../../../components/alarm-overlay";
 import { LockdownOverlay } from "../../../components/lockdown-overlay";
 import { GameInviteOverlay } from "../../../components/game-invite-overlay";
 import { KidLockEnforcer } from "../../../components/kid-lock-enforcer";
+import { AppBlockSync } from "../../../components/app-block-sync";
 import { useData } from "../../../lib/data/store";
 import { notificationFeature } from "../../../lib/data/badges";
 
@@ -241,6 +242,9 @@ export default function KidLayout() {
 
       {/* Instant lock — bring app to front + enforce the un-leaveable lock screen */}
       {id && <KidLockEnforcer kidId={id} />}
+
+      {/* Keep the native app-block list in sync with App Rules in real time */}
+      <AppBlockSync />
     </View>
   );
 }

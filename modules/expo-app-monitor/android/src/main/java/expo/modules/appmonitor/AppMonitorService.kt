@@ -148,12 +148,19 @@ class AppMonitorService : AccessibilityService() {
       if (pkg != currentForegroundPackage) {
         currentForegroundPackage = pkg
         val effectiveBlocked = blockedPackages + if (studyModeActive) studyModePackages else emptySet()
+        val isBlocked = effectiveBlocked.contains(pkg)
         val intent = Intent(ACTION_APP_CHANGED).apply {
           putExtra(EXTRA_PACKAGE, pkg)
-          putExtra("isBlocked", effectiveBlocked.contains(pkg))
+          putExtra("isBlocked", isBlocked)
           setPackage(packageName)
         }
         sendBroadcast(intent)
+        // Enforce the block natively: kick the child straight out to the home
+        // screen. This works even without the overlay permission (the JS overlay
+        // is a bonus cover on top).
+        if (isBlocked && pkg != packageName && !isSystemUiPackage(pkg)) {
+          try { performGlobalAction(GLOBAL_ACTION_HOME) } catch (_: Exception) {}
+        }
       }
     }
 
