@@ -11,7 +11,7 @@
  * Checkers, Chess, and Trash. Move shapes are per-game (see ogApply in store).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, StatusBar, Animated, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert, StatusBar, Animated, ScrollView, useWindowDimensions } from "react-native";
 import { useData } from "../lib/data/store";
 import { Colors } from "../lib/theme";
 import { uid, nowIso } from "../lib/utils";
@@ -314,7 +314,8 @@ export function OnlineGame({ me, meName, onExit }: { me: string; meName: string;
 
 // ─── Tic-Tac-Toe board ────────────────────────────────────────────────────────
 function TTTBoard({ board, canPlay, onMove }: { board: (string | null)[]; canPlay: boolean; onMove: (m: any) => void }) {
-  const SIZE = Math.min(SCREEN_W - 40, SCREEN_H * 0.5, 420);
+  const { width: W, height: H } = useWindowDimensions();
+  const SIZE = Math.min(W - 32, H - 230);
   const cell = (SIZE - 16) / 3;
   return (
     <View style={[tt.grid, { width: SIZE, height: SIZE }]}>
@@ -337,7 +338,8 @@ function TTTBoard({ board, canPlay, onMove }: { board: (string | null)[]; canPla
 
 // ─── Connect 4 board ──────────────────────────────────────────────────────────
 function C4Board({ board, canPlay, onMove }: { board: (number | null)[][]; canPlay: boolean; onMove: (m: any) => void }) {
-  const cell = Math.min((SCREEN_W - 36) / C4_COLS, (SCREEN_H * 0.52) / C4_ROWS, 52);
+  const { width: W, height: H } = useWindowDimensions();
+  const cell = Math.floor(Math.min((W - 24) / C4_COLS, (H - 260) / C4_ROWS));
   return (
     <View>
       <View style={{ flexDirection: "row", justifyContent: "center", marginBottom: 6 }}>
@@ -435,7 +437,8 @@ function CheckersBoard({ board, turn, canPlay, onMove }: { board: any[][]; turn:
   const movable = useMemo(() => new Set(legal.map(m => `${m.from[0]},${m.from[1]}`)), [legal]);
   const dests = useMemo(() => sel ? legal.filter(m => m.from[0] === sel[0] && m.from[1] === sel[1]) : [], [legal, sel]);
   const destSet = useMemo(() => new Set(dests.map(m => `${m.to[0]},${m.to[1]}`)), [dests]);
-  const cell = Math.min((SCREEN_W - 24) / 8, (SCREEN_H * 0.52) / 8, 44);
+  const { width: W, height: H } = useWindowDimensions();
+  const cell = Math.floor(Math.min(W - 16, H - 230) / 8); // fill the screen; scales up on tablets
 
   function tap(r: number, c: number) {
     if (!canPlay || (r + c) % 2 === 0) return;
@@ -488,7 +491,8 @@ function ChessBoard({ state, turn, canPlay, onMove }: { state: ChessState; turn:
   const movable = useMemo(() => new Set(legal.map(m => `${m.from[0]},${m.from[1]}`)), [legal]);
   const dests = useMemo(() => sel ? legal.filter(m => m.from[0] === sel[0] && m.from[1] === sel[1]) : [], [legal, sel]);
   const destSet = useMemo(() => new Set(dests.map(m => `${m.to[0]},${m.to[1]}`)), [dests]);
-  const cell = Math.min((SCREEN_W - 24) / 8, (SCREEN_H * 0.52) / 8, 44);
+  const { width: W, height: H } = useWindowDimensions();
+  const cell = Math.floor(Math.min(W - 16, H - 230) / 8); // fill the screen; scales up on tablets
 
   function tap(r: number, c: number) {
     if (!canPlay) return;
