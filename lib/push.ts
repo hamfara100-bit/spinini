@@ -40,11 +40,9 @@ export async function registerForPush(ownerId: string, role: PushRole): Promise<
     const membership = await getMembership();
     if (!membership?.familyId) return;
 
+    // CHECK only — don't prompt on every launch (the pairing flow already asks).
     const perm = await Notifications.getPermissionsAsync();
-    if (!perm.granted) {
-      const req = await Notifications.requestPermissionsAsync();
-      if (!req.granted) return;
-    }
+    if (!perm.granted) return;
 
     const tok = await Notifications.getDevicePushTokenAsync(); // FCM registration token
     const token = typeof tok?.data === "string" ? tok.data : null;

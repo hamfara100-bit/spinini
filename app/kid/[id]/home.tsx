@@ -426,7 +426,10 @@ export default function KidHome() {
     let cancelled = false;
     async function capture() {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        // CHECK only — never prompt here. Requesting on every mount popped the
+        // "Allow location?" dialog on every app start. The one-time request
+        // happens during pairing; otherwise the parent enables it via Setup Health.
+        const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== "granted" || cancelled) return;
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         if (cancelled) return;
