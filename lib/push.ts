@@ -37,12 +37,18 @@ async function familyId(): Promise<string | null> {
 export async function registerForPush(ownerId: string, role: PushRole): Promise<void> {
   try {
     if (Platform.OS !== "android") return; // FCM path is Android-only for now
-    const membership = await getMembership();
-    if (!membership?.familyId) return;
 
-    // CHECK only — don't prompt on every launch (the pairing flow already asks).
-    const perm = await Notifications.getPermissionsAsync();
+    // Notifications are essential — request them FIRST (independent of family /
+    // pairing). Android 13+ needs the runtime grant; without it NOTHING shows,
+    // foreground or background. We stop once permanently denied (not a nag).
+    let perm = await Notifications.getPermissionsAsync();
+    if (!perm.granted && perm.canAskAgain) {
+      perm = await Notifications.requestPermissionsAsync();
+    }
     if (!perm.granted) return;
+
+    const membership = await getMembership();
+    if (!membership?.familyId) return; // token registration needs a family
 
     const tok = await Notifications.getDevicePushTokenAsync(); // FCM registration token
     const token = typeof tok?.data === "string" ? tok.data : null;
