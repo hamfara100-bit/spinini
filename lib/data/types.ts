@@ -2224,7 +2224,7 @@ export type AppAction =
   | { type: "OGAME_INVITE_CLEAR"; toId: string }
   // Setup
   | { type: "SETUP_COMPLETE" }
-  | { type: "SET_DEVICE_ROLE"; role: "parent" | "kid" }
+  | { type: "SET_DEVICE_ROLE"; role: "parent" | "kid" | null }
   | { type: "SET_PARENT_SETTINGS"; payload: Partial<ParentSettings> }
   | { type: "SET_PARENT_PROFILE"; payload: Partial<ParentProfile> }
   | { type: "SET_PARENT_MEMBERSHIP"; payload: ParentMembership }

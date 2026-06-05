@@ -259,6 +259,11 @@ export default function ParentOnboarding() {
         }}>
           <Text style={s.link}>{authMode === "signup" ? "Already have an account? Log in" : "Need an account? Sign up"}</Text>
         </TouchableOpacity>
+
+        {/* Picked the wrong role? Go back to the chooser. */}
+        <TouchableOpacity onPress={() => { dispatch({ type: "SET_DEVICE_ROLE", role: null }); router.replace("/onboarding"); }} style={{ marginTop: 8 }}>
+          <Text style={[s.link, { opacity: 0.7 }]}>← This isn't a parent device — choose again</Text>
+        </TouchableOpacity>
       </ScrollView>
     );
   }
